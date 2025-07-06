@@ -49,7 +49,25 @@ def update():
 
     return {"status": "ok", "added": len(new_data)}, 200
 
+@app.route("/delete", methods=["POST"])
+def delete():
+    entry_id = request.json.get("id")
+    if not entry_id:
+        return {"error": "Missing ID"}, 400
+
+    if os.path.exists(MENTIONS_FILE):
+        with open(MENTIONS_FILE, "r", encoding="utf-8") as f:
+            mentions = json.load(f)
+
+        mentions = [entry for entry in mentions if entry["id"] != entry_id]
+
+        with open(MENTIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(mentions, f, ensure_ascii=False, indent=2)
+
+        return {"status": "deleted", "id": entry_id}
+    else:
+        return {"error": "Mentions file not found"}, 404
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
-
