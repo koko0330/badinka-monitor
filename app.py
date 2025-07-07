@@ -4,7 +4,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
 def get_db_connection():
     conn = psycopg2.connect(DATABASE_URL)
@@ -16,9 +16,13 @@ def index():
 
 @app.route("/data")
 def get_mentions():
+    brand = request.args.get("brand", "badinka")  # Default to 'badinka'
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT * FROM mentions ORDER BY created DESC LIMIT 100;")
+    cur.execute(
+        "SELECT * FROM mentions WHERE brand = %s ORDER BY created DESC LIMIT 100;",
+        (brand,)
+    )
     mentions = cur.fetchall()
     cur.close()
     conn.close()
