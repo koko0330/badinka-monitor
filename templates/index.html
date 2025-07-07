@@ -9,6 +9,15 @@
     th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
     th { background-color: #f4f4f4; }
     button { padding: 4px 8px; font-size: 12px; cursor: pointer; }
+
+    .badge {
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: white;
+      font-size: 12px;
+    }
+    .positive { background-color: green; }
+    .negative { background-color: red; }
   </style>
 </head>
 <body>
@@ -24,6 +33,7 @@
         <th>Link</th>
         <th>Created</th>
         <th>Preview</th>
+        <th>Sentiment</th>
         <th>Action</th>
       </tr>
     </thead>
@@ -41,8 +51,10 @@
           data.sort((a, b) => new Date(b.created) - new Date(a.created));
 
           data.forEach(item => {
-            const row = document.createElement("tr");
+            const sentiment = item.sentiment || "positive"; // default fallback
+            const sentimentBadge = `<span class="badge ${sentiment}">${sentiment}</span>`;
 
+            const row = document.createElement("tr");
             row.innerHTML = `
               <td>${item.type}</td>
               <td>${item.subreddit}</td>
@@ -50,9 +62,9 @@
               <td><a href="${item.permalink}" target="_blank">View</a></td>
               <td>${new Date(item.created).toLocaleString()}</td>
               <td>${(item.body || item.title || "").slice(0, 120)}</td>
+              <td>${sentimentBadge}</td>
               <td><button onclick="deleteEntry('${item.id}')">🗑️ Delete</button></td>
             `;
-
             tbody.appendChild(row);
           });
         });
