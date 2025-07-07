@@ -15,8 +15,10 @@
       border-radius: 4px;
       color: white;
       font-size: 12px;
+      text-transform: capitalize;
     }
     .positive { background-color: limegreen; }
+    .neutral  { background-color: gray; }
     .negative { background-color: red; }
   </style>
 </head>
@@ -51,7 +53,7 @@
           data.sort((a, b) => new Date(b.created) - new Date(a.created));
 
           data.forEach(item => {
-            const sentiment = item.sentiment || "positive"; // default fallback
+            const sentiment = item.sentiment || "neutral"; // default fallback
             const sentimentBadge = `<span class="badge ${sentiment}">${sentiment}</span>`;
 
             const row = document.createElement("tr");
