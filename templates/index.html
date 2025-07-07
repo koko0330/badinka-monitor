@@ -41,7 +41,17 @@
     </thead>
     <tbody></tbody>
   </table>
-
+  <script>
+    function highlightKeyword(text, keyword) {
+    if (!keyword) return text;
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(escaped, "gi");
+    return text.replace(regex, match => `<strong>${match}</strong>`);
+  }
+  
+  // In .forEach loop:
+  <td>${highlightKeyword(item.body || item.title || "", item.matched_keyword)}</td>
+  </script>
   <script>
     function loadData() {
       fetch("/data")
