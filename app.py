@@ -1,72 +1,44 @@
-from flask import Flask, render_template, jsonify, send_file, request
-import json
-import pandas as pd
-from datetime import datetime
+from flask import Flask, render_template, jsonify, request
 import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-MENTIONS_FILE = "mentions.json"
-CSV_FILE = "mentions.csv"
+def get_db_connection():
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
 @app.route("/data")
-def data():
-    if os.path.exists(MENTIONS_FILE):
-        with open(MENTIONS_FILE, "r", encoding="utf-8") as f:
-            return jsonify(json.load(f))
-    return jsonify([])
-
-@app.route("/download")
-def download():
-    if os.path.exists(MENTIONS_FILE):
-        with open(MENTIONS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        df = pd.DataFrame(data)
-        df.to_csv(CSV_FILE, index=False)
-        return send_file(CSV_FILE, as_attachment=True)
-    return "No data available", 404
-
-@app.route("/update", methods=["POST"])
-def update():
-    new_data = request.json
-    if os.path.exists(MENTIONS_FILE):
-        with open(MENTIONS_FILE, "r", encoding="utf-8") as f:
-            mentions = json.load(f)
-    else:
-        mentions = []
-
-    existing_ids = {entry["id"] for entry in mentions}
-    for item in new_data:
-        if item["id"] not in existing_ids:
-            mentions.append(item)
-
-    with open(MENTIONS_FILE, "w", encoding="utf-8") as f:
-        json.dump(mentions, f, ensure_ascii=False, indent=2)
-
-    return {"status": "ok", "added": len(new_data)}, 200
+def get_mentions():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM mentions ORDER BY created DESC LIMIT 100;")
+    mentions = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify(mentions)
 
 @app.route("/delete", methods=["POST"])
-def delete():
-    entry_id = request.json.get("id")
-    if not entry_id:
-        return {"error": "Missing ID"}, 400
+def delete_mention():
+    data = request.get_json()
+    mention_id = data.get("id")
+    if not mention_id:
+        return jsonify({"error": "Missing id"}), 400
 
-    if os.path.exists(MENTIONS_FILE):
-        with open(MENTIONS_FILE, "r", encoding="utf-8") as f:
-            mentions = json.load(f)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM mentions WHERE id = %s;", (mention_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
 
-        mentions = [entry for entry in mentions if entry["id"] != entry_id]
-
-        with open(MENTIONS_FILE, "w", encoding="utf-8") as f:
-            json.dump(mentions, f, ensure_ascii=False, indent=2)
-
-        return {"status": "deleted", "id": entry_id}
-    else:
-        return {"error": "Mentions file not found"}, 404
+    return jsonify({"status": "deleted", "id": mention_id})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
