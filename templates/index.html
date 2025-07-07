@@ -63,7 +63,7 @@
               <td>${item.author}</td>
               <td><a href="${item.permalink}" target="_blank">View</a></td>
               <td>${new Date(item.created).toLocaleString()}</td>
-              <td>${(item.body || item.title || "").slice(0, 120)}</td>
+              <td>${item.body || item.title || ""}</td>
               <td>${sentimentBadge}</td>
               <td><button onclick="deleteEntry('${item.id}')">🗑️ Delete</button></td>
             `;
