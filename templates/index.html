@@ -28,9 +28,9 @@
     #stats-tab { display: none; }
     .stats-container { display: flex; gap: 30px; align-items: flex-start; margin-top: 20px; }
     .stat-block { flex: 1; background: #fff; padding: 16px; border: 1px solid #ddd; border-radius: 6px; }
-    .charts-container { display: flex; justify-content: space-between; margin-top: 20px; gap: 30px; }
-    .charts-container canvas { background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
-    .pdf-btn { margin-top: 10px; display: inline-block; }
+    .charts-container { display: flex; justify-content: space-between; margin-top: 20px; gap: 30px; flex-wrap: wrap; }
+    .charts-container canvas { background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd; max-width: 100%; height: auto; }
+    .pdf-btn, .csv-btn { margin-top: 10px; display: inline-block; }
   </style>
 </head>
 <body>
@@ -42,7 +42,7 @@
     <button id="btn-stats" onclick="showStats()">Stats</button>
   </div>
 
-  <p id="download-link"><a href="/download">📥 Download CSV</a></p>
+  <p id="download-link" class="csv-btn"><button onclick="window.location.href='/download'">📥 Download CSV</button></p>
 
   <div id="mentions-tab">
     <table id="data-table">
@@ -69,8 +69,8 @@
       <div id="stats-right" class="stat-block"></div>
     </div>
     <div class="charts-container">
-      <canvas id="pie-left" width="250" height="250"></canvas>
-      <canvas id="pie-right" width="250" height="250"></canvas>
+      <canvas id="pie-left" width="300" height="300"></canvas>
+      <canvas id="pie-right" width="300" height="300"></canvas>
     </div>
     <div class="pdf-btn">
       <button onclick="downloadPDF()">📄 Download as PDF</button>
@@ -79,6 +79,7 @@
 
   <script>
     let currentBrand = "badinka";
+    let charts = {};
 
     function switchBrand(brand) {
       currentBrand = brand;
@@ -87,7 +88,7 @@
       document.getElementById("btn-badinka").disabled = (brand === "badinka");
       document.getElementById("btn-iheartraves").disabled = (brand === "iheartraves");
       document.getElementById("btn-stats").disabled = false;
-      document.getElementById("download-link").innerHTML = '<a href="/download">📥 Download CSV</a>';
+      document.getElementById("download-link").style.display = 'inline-block';
       loadData();
     }
 
@@ -97,7 +98,7 @@
       document.getElementById("btn-badinka").disabled = false;
       document.getElementById("btn-iheartraves").disabled = false;
       document.getElementById("btn-stats").disabled = true;
-      document.getElementById("download-link").innerHTML = '';
+      document.getElementById("download-link").style.display = 'none';
       loadStats();
     }
 
@@ -150,9 +151,10 @@
       const totalMentionsToday = data.daily.posts + data.daily.comments;
       const totalMentionsAll = data.total.posts + data.total.comments;
 
+      const perceptionClass = data.score > 60 ? 'positive' : data.score >= 40 ? 'neutral' : 'negative';
       const container = document.getElementById(`stats-${side}`);
       container.innerHTML = `
-        <h3>${data.display_name}</h3>
+        <h3>${data.display_name || 'Unknown Brand'}</h3>
         <table>
           <tr><th colspan="2">Today</th></tr>
           <tr><td>Posts</td><td>${data.daily.posts}</td></tr>
@@ -162,12 +164,13 @@
           <tr><td>Posts</td><td>${data.total.posts}</td></tr>
           <tr><td>Comments</td><td>${data.total.comments}</td></tr>
           <tr><td><strong>Total</strong></td><td><strong>${totalMentionsAll}</strong></td></tr>
-          <tr><td>Perception Score</td><td>${data.score}/100</td></tr>
+          <tr><th>Brand Perception Score</th><td class="${perceptionClass}"><strong>${data.score}/100</strong></td></tr>
         </table>
       `;
 
       const ctx = document.getElementById(`pie-${side}`).getContext("2d");
-      new Chart(ctx, {
+      if (charts[side]) charts[side].destroy();
+      charts[side] = new Chart(ctx, {
         type: "pie",
         data: {
           labels: ["Positive", "Neutral", "Negative"],
