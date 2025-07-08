@@ -28,9 +28,10 @@
     #stats-tab { display: none; }
     .stats-container { display: flex; gap: 30px; align-items: flex-start; margin-top: 20px; }
     .stat-block { flex: 1; background: #fff; padding: 16px; border: 1px solid #ddd; border-radius: 6px; }
-    .charts-container { display: flex; justify-content: space-between; margin-top: 20px; gap: 30px; flex-wrap: wrap; }
-    .charts-container canvas { background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd; max-width: 100%; height: auto; }
+    .charts-container { display: flex; justify-content: space-between; margin-top: 20px; gap: 30px; flex-wrap: nowrap; }
+    .charts-container canvas { background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd; width: 100%; max-width: 400px; height: auto; }
     .pdf-btn, .csv-btn { margin-top: 10px; display: inline-block; }
+    .score-label { font-weight: bold; color: white; padding: 4px 8px; border-radius: 4px; display: inline-block; }
   </style>
 </head>
 <body>
@@ -42,7 +43,10 @@
     <button id="btn-stats" onclick="showStats()">Stats</button>
   </div>
 
-  <p id="download-link" class="csv-btn"><button onclick="window.location.href='/download'">📥 Download CSV</button></p>
+  <p id="download-link" class="csv-btn">
+    <button id="csv-btn" onclick="window.location.href='/download'">📥 Download CSV</button>
+    <button id="pdf-btn" style="display:none;" onclick="downloadPDF()">📄 Download as PDF</button>
+  </p>
 
   <div id="mentions-tab">
     <table id="data-table">
@@ -72,9 +76,6 @@
       <canvas id="pie-left" width="300" height="300"></canvas>
       <canvas id="pie-right" width="300" height="300"></canvas>
     </div>
-    <div class="pdf-btn">
-      <button onclick="downloadPDF()">📄 Download as PDF</button>
-    </div>
   </div>
 
   <script>
@@ -89,6 +90,8 @@
       document.getElementById("btn-iheartraves").disabled = (brand === "iheartraves");
       document.getElementById("btn-stats").disabled = false;
       document.getElementById("download-link").style.display = 'inline-block';
+      document.getElementById("csv-btn").style.display = 'inline-block';
+      document.getElementById("pdf-btn").style.display = 'none';
       loadData();
     }
 
@@ -98,7 +101,8 @@
       document.getElementById("btn-badinka").disabled = false;
       document.getElementById("btn-iheartraves").disabled = false;
       document.getElementById("btn-stats").disabled = true;
-      document.getElementById("download-link").style.display = 'none';
+      document.getElementById("csv-btn").style.display = 'none';
+      document.getElementById("pdf-btn").style.display = 'inline-block';
       loadStats();
     }
 
@@ -154,7 +158,7 @@
       const perceptionClass = data.score > 60 ? 'positive' : data.score >= 40 ? 'neutral' : 'negative';
       const container = document.getElementById(`stats-${side}`);
       container.innerHTML = `
-        <h3>${data.display_name || 'Unknown Brand'}</h3>
+        <h3>${data.display_name || data.brand || 'Unknown Brand'}</h3>
         <table>
           <tr><th colspan="2">Today</th></tr>
           <tr><td>Posts</td><td>${data.daily.posts}</td></tr>
@@ -164,7 +168,7 @@
           <tr><td>Posts</td><td>${data.total.posts}</td></tr>
           <tr><td>Comments</td><td>${data.total.comments}</td></tr>
           <tr><td><strong>Total</strong></td><td><strong>${totalMentionsAll}</strong></td></tr>
-          <tr><th>Brand Perception Score</th><td class="${perceptionClass}"><strong>${data.score}/100</strong></td></tr>
+          <tr><th>Brand Perception Score</th><td><span class="score-label ${perceptionClass}">${data.score}/100</span></td></tr>
         </table>
       `;
 
