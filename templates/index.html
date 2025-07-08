@@ -20,8 +20,8 @@
     .positive { background-color: limegreen; }
     .neutral  { background-color: gray; }
     .negative { background-color: red; }
-    #brand-buttons, #tab-buttons { margin-bottom: 10px; }
-    #brand-buttons button, #tab-buttons button { margin-right: 6px; }
+    #brand-buttons { margin-bottom: 10px; }
+    #brand-buttons button { margin-right: 6px; }
     #brand-buttons button:disabled {
       background-color: #ccc;
       cursor: default;
@@ -39,16 +39,12 @@
   <div id="brand-buttons">
     <button id="btn-badinka" onclick="switchBrand('badinka')">My Brand</button>
     <button id="btn-iheartraves" onclick="switchBrand('iheartraves')">My Competitor</button>
-  </div>
-
-  <div id="tab-buttons">
-    <button onclick="showTab('mentions')">Mentions</button>
-    <button onclick="showTab('stats')">Stats</button>
+    <button id="btn-stats" onclick="showStats()">Stats</button>
   </div>
 
   <p><a href="/download">📥 Download CSV</a></p>
 
-  <!-- Mentions Tab -->
+  <!-- Mentions View -->
   <div id="mentions-tab">
     <table id="data-table">
       <thead>
@@ -67,7 +63,7 @@
     </table>
   </div>
 
-  <!-- Stats Tab -->
+  <!-- Stats View -->
   <div id="stats-tab" style="display: none;">
     <h2>Brand Stats</h2>
     <div style="display: flex; gap: 40px;">
@@ -83,11 +79,23 @@
   <script>
     let currentBrand = "badinka";
 
-    function showTab(tab) {
-      document.getElementById("mentions-tab").style.display = (tab === "mentions") ? "block" : "none";
-      document.getElementById("stats-tab").style.display = (tab === "stats") ? "block" : "none";
-      if (tab === "mentions") loadData();
-      if (tab === "stats") loadStats();
+    function switchBrand(brand) {
+      currentBrand = brand;
+      document.getElementById("mentions-tab").style.display = "block";
+      document.getElementById("stats-tab").style.display = "none";
+      document.getElementById("btn-badinka").disabled = (brand === "badinka");
+      document.getElementById("btn-iheartraves").disabled = (brand === "iheartraves");
+      document.getElementById("btn-stats").disabled = false;
+      loadData();
+    }
+
+    function showStats() {
+      document.getElementById("mentions-tab").style.display = "none";
+      document.getElementById("stats-tab").style.display = "block";
+      document.getElementById("btn-badinka").disabled = false;
+      document.getElementById("btn-iheartraves").disabled = false;
+      document.getElementById("btn-stats").disabled = true;
+      loadStats();
     }
 
     function loadData() {
@@ -129,7 +137,6 @@
 
     function deleteEntry(id) {
       if (!confirm("Are you sure you want to delete this entry?")) return;
-
       fetch("/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -137,13 +144,6 @@
       })
       .then(res => res.json())
       .then(() => loadData());
-    }
-
-    function switchBrand(brand) {
-      currentBrand = brand;
-      loadData();
-      document.getElementById("btn-badinka").disabled = (brand === "badinka");
-      document.getElementById("btn-iheartraves").disabled = (brand === "iheartraves");
     }
 
     function loadStats() {
@@ -160,8 +160,8 @@
       const container = document.getElementById(`stats-${side}`);
       container.innerHTML = `
         <h3>${data.brand === "badinka" ? "My Brand" : "My Competitor"}</h3>
-        <p><strong>Daily Posts:</strong> ${data.daily.posts}</p>
-        <p><strong>Daily Comments:</strong> ${data.daily.comments}</p>
+        <p><strong>Posts made today:</strong> ${data.daily.posts}</p>
+        <p><strong>Comments made today:</strong> ${data.daily.comments}</p>
         <p><strong>Total Posts:</strong> ${data.total.posts}</p>
         <p><strong>Total Comments:</strong> ${data.total.comments}</p>
         <p><strong>Perception Score:</strong> ${data.score}/100</p>
@@ -185,15 +185,13 @@
           responsive: true,
           plugins: {
             legend: { position: "bottom" },
-            title: {
-              display: false
-            }
+            title: { display: false }
           }
         }
       });
     }
 
-    // Initial load and button state
+    // Initial state
     switchBrand(currentBrand);
     setInterval(loadData, 30000);
   </script>
