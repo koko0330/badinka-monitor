@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Reddit Brand Monitoring</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: sans-serif; margin: 20px; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -19,17 +20,17 @@
     .positive { background-color: limegreen; }
     .neutral  { background-color: gray; }
     .negative { background-color: red; }
-    /* Styles for brand buttons */
-    #brand-buttons {
-      margin-bottom: 10px;
-    }
-    #brand-buttons button {
-      margin-right: 6px;
-    }
+    #brand-buttons, #tab-buttons { margin-bottom: 10px; }
+    #brand-buttons button, #tab-buttons button { margin-right: 6px; }
     #brand-buttons button:disabled {
       background-color: #ccc;
       cursor: default;
     }
+    #stats-tab canvas {
+      margin-top: 20px;
+      max-width: 250px;
+    }
+    .stat-block h3 { margin-top: 0; }
   </style>
 </head>
 <body>
@@ -40,26 +41,54 @@
     <button id="btn-iheartraves" onclick="switchBrand('iheartraves')">My Competitor</button>
   </div>
 
+  <div id="tab-buttons">
+    <button onclick="showTab('mentions')">Mentions</button>
+    <button onclick="showTab('stats')">Stats</button>
+  </div>
+
   <p><a href="/download">📥 Download CSV</a></p>
 
-  <table id="data-table">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Subreddit</th>
-        <th>Author</th>
-        <th>Link</th>
-        <th>Created</th>
-        <th>Preview</th>
-        <th>Sentiment</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <!-- Mentions Tab -->
+  <div id="mentions-tab">
+    <table id="data-table">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Subreddit</th>
+          <th>Author</th>
+          <th>Link</th>
+          <th>Created</th>
+          <th>Preview</th>
+          <th>Sentiment</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Stats Tab -->
+  <div id="stats-tab" style="display: none;">
+    <h2>Brand Stats</h2>
+    <div style="display: flex; gap: 40px;">
+      <div id="stats-left" class="stat-block" style="flex: 1;"></div>
+      <div id="stats-right" class="stat-block" style="flex: 1;"></div>
+    </div>
+    <div style="display: flex; gap: 40px;">
+      <canvas id="pie-left"></canvas>
+      <canvas id="pie-right"></canvas>
+    </div>
+  </div>
 
   <script>
     let currentBrand = "badinka";
+
+    function showTab(tab) {
+      document.getElementById("mentions-tab").style.display = (tab === "mentions") ? "block" : "none";
+      document.getElementById("stats-tab").style.display = (tab === "stats") ? "block" : "none";
+      if (tab === "mentions") loadData();
+      if (tab === "stats") loadStats();
+    }
 
     function loadData() {
       fetch(`/data?brand=${currentBrand}`)
@@ -71,7 +100,7 @@
           data.sort((a, b) => new Date(b.created) - new Date(a.created));
 
           data.forEach(item => {
-            const sentiment = item.sentiment || "neutral"; // default fallback
+            const sentiment = item.sentiment || "neutral";
             const sentimentBadge = `<span class="badge ${sentiment}">${sentiment}</span>`;
 
             const row = document.createElement("tr");
@@ -113,16 +142,59 @@
     function switchBrand(brand) {
       currentBrand = brand;
       loadData();
-
-      // Update buttons disabled state
       document.getElementById("btn-badinka").disabled = (brand === "badinka");
       document.getElementById("btn-iheartraves").disabled = (brand === "iheartraves");
     }
 
-    // Initial load and button states
-    switchBrand(currentBrand);
+    function loadStats() {
+      fetch(`/stats?brand=badinka`)
+        .then(res => res.json())
+        .then(data => renderStats(data, "left"));
 
-    // Auto-refresh every 30 seconds
+      fetch(`/stats?brand=iheartraves`)
+        .then(res => res.json())
+        .then(data => renderStats(data, "right"));
+    }
+
+    function renderStats(data, side) {
+      const container = document.getElementById(`stats-${side}`);
+      container.innerHTML = `
+        <h3>${data.brand === "badinka" ? "My Brand" : "My Competitor"}</h3>
+        <p><strong>Daily Posts:</strong> ${data.daily.posts}</p>
+        <p><strong>Daily Comments:</strong> ${data.daily.comments}</p>
+        <p><strong>Total Posts:</strong> ${data.total.posts}</p>
+        <p><strong>Total Comments:</strong> ${data.total.comments}</p>
+        <p><strong>Perception Score:</strong> ${data.score}/100</p>
+      `;
+
+      const ctx = document.getElementById(`pie-${side}`).getContext("2d");
+      new Chart(ctx, {
+        type: "pie",
+        data: {
+          labels: ["Positive", "Neutral", "Negative"],
+          datasets: [{
+            data: [
+              data.sentiment.positive,
+              data.sentiment.neutral,
+              data.sentiment.negative
+            ],
+            backgroundColor: ["limegreen", "gray", "red"]
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "bottom" },
+            title: {
+              display: false
+            }
+          }
+        }
+      });
+    }
+
+    // Initial load and button state
+    switchBrand(currentBrand);
     setInterval(loadData, 30000);
   </script>
 </body>
