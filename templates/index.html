@@ -5,6 +5,7 @@
   <title>Reddit Brand Monitoring</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body { font-family: sans-serif; margin: 20px; background-color: #f9f9f9; color: #333; }
     h1, h2, h3 { color: #222; }
@@ -29,9 +30,23 @@
     .stats-container { display: flex; gap: 30px; align-items: flex-start; margin-top: 20px; }
     .stat-block { flex: 1; background: #fff; padding: 16px; border: 1px solid #ddd; border-radius: 6px; }
     .charts-container { display: flex; justify-content: space-between; margin-top: 20px; gap: 30px; flex-wrap: nowrap; }
-    .charts-container canvas { background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd; width: 100%; max-width: 400px; height: auto; }
-    .pdf-btn, .csv-btn { margin-top: 10px; display: inline-block; }
-    .score-label { font-weight: bold; color: white; padding: 4px 8px; border-radius: 4px; display: inline-block; }
+    .charts-container canvas {
+      background: #fff;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      max-width: 400px;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+    }
+    .pdf-btn, .csv-btn { display: inline-block; margin-top: 10px; }
+    .score-label {
+      font-weight: bold;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: inline-block;
+    }
   </style>
 </head>
 <body>
@@ -73,8 +88,8 @@
       <div id="stats-right" class="stat-block"></div>
     </div>
     <div class="charts-container">
-      <canvas id="pie-left" width="300" height="300"></canvas>
-      <canvas id="pie-right" width="300" height="300"></canvas>
+      <canvas id="pie-left"></canvas>
+      <canvas id="pie-right"></canvas>
     </div>
   </div>
 
@@ -168,7 +183,7 @@
           <tr><td>Posts</td><td>${data.total.posts}</td></tr>
           <tr><td>Comments</td><td>${data.total.comments}</td></tr>
           <tr><td><strong>Total</strong></td><td><strong>${totalMentionsAll}</strong></td></tr>
-          <tr><th>Brand Perception Score</th><td><span class="score-label ${perceptionClass}">${data.score}/100</span></td></tr>
+          <tr><th>Brand Perception Score</th><td><span class="score-label ${perceptionClass}"><strong>${data.score}/100</strong></span></td></tr>
         </table>
       `;
 
@@ -185,6 +200,7 @@
         },
         options: {
           responsive: true,
+          maintainAspectRatio: true,
           plugins: { legend: { position: "bottom" } }
         }
       });
@@ -192,13 +208,14 @@
 
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.text("Reddit Brand Monitoring - Head to Head Stats", 10, 10);
-      doc.html(document.querySelector("#stats-tab"), {
-        callback: function (doc) {
-          doc.save("brand-stats.pdf");
-        },
-        x: 10, y: 20
+      html2canvas(document.querySelector("#stats-tab")).then(canvas => {
+        const doc = new jsPDF();
+        const imgData = canvas.toDataURL("image/png");
+        const imgProps = doc.getImageProperties(imgData);
+        const pdfWidth = doc.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        doc.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+        doc.save("brand-stats.pdf");
       });
     }
 
