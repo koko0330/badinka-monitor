@@ -1,17 +1,15 @@
-from flask import Flask, render_template, jsonify, request
-from flask import send_file
-from datetime import datetime, timedelta
+from flask import Flask, render_template, jsonify, request, send_file
+from datetime import datetime, time
 import os
+import pytz
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from datetime import datetime, timedelta
 
 app = Flask(__name__)
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
 def get_db_connection():
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+    return psycopg2.connect(DATABASE_URL)
 
 @app.route("/")
 def index():
@@ -19,7 +17,7 @@ def index():
 
 @app.route("/data")
 def get_mentions():
-    brand = request.args.get("brand", "badinka")  # Default to 'badinka'
+    brand = request.args.get("brand", "badinka")
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute(
@@ -49,19 +47,21 @@ def delete_mention():
 
 @app.route("/stats")
 def get_stats():
-    brand = request.args.get("brand", "badinka")  # brand param
+    brand = request.args.get("brand", "badinka")
+
+    # Get start of "today" in Europe/Sofia and convert to UTC
+    local_tz = pytz.timezone("Europe/Sofia")
+    now_local = datetime.now(local_tz)
+    start_of_day_local = datetime.combine(now_local.date(), time.min).replace(tzinfo=local_tz)
+    start_of_day_utc = start_of_day_local.astimezone(pytz.utc)
 
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # --- Date range for today ---
-    now = datetime.utcnow()
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    
     # --- Daily Mentions ---
-    cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'post' AND created >= %s", (brand, start_of_day))
+    cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'post' AND created >= %s", (brand, start_of_day_utc))
     daily_posts = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'comment' AND created >= %s", (brand, start_of_day))
+    cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'comment' AND created >= %s", (brand, start_of_day_utc))
     daily_comments = cur.fetchone()[0]
 
     # --- Total Mentions ---
@@ -82,13 +82,13 @@ def get_stats():
     cur.close()
     conn.close()
 
-    # Fill in missing sentiments with 0
+    # Fill missing sentiments
     pos = sentiment_counts.get("positive", 0)
     neu = sentiment_counts.get("neutral", 0)
     neg = sentiment_counts.get("negative", 0)
     total = pos + neu + neg
 
-    # Perception score (0-100 scale)
+    # Perception score (0-100)
     score = round((pos * 100 + neu * 50 + neg * 0) / total) if total > 0 else 0
 
     return jsonify({
@@ -98,6 +98,10 @@ def get_stats():
         "sentiment": {"positive": pos, "neutral": neu, "negative": neg},
         "score": score
     })
+
+@app.route("/download")
+def download_csv():
+    return send_file("mentions.csv", as_attachment=True)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
