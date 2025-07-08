@@ -4,12 +4,15 @@
   <meta charset="UTF-8" />
   <title>Reddit Brand Monitoring</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 20px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
-    th { background-color: #f4f4f4; }
-    button { padding: 4px 8px; font-size: 12px; cursor: pointer; }
+    body { font-family: sans-serif; margin: 20px; background-color: #f9f9f9; color: #333; }
+    h1, h2, h3 { color: #222; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #fff; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f0f0f0; }
+    button { padding: 6px 12px; font-size: 14px; cursor: pointer; border-radius: 4px; border: none; background-color: #007bff; color: white; }
+    button:disabled { background-color: #aaa; cursor: not-allowed; }
     .badge {
       padding: 2px 6px;
       border-radius: 4px;
@@ -20,17 +23,14 @@
     .positive { background-color: limegreen; }
     .neutral  { background-color: gray; }
     .negative { background-color: red; }
-    #brand-buttons { margin-bottom: 10px; }
-    #brand-buttons button { margin-right: 6px; }
-    #brand-buttons button:disabled {
-      background-color: #ccc;
-      cursor: default;
-    }
-    #stats-tab canvas {
-      margin-top: 20px;
-      max-width: 250px;
-    }
-    .stat-block h3 { margin-top: 0; }
+    #brand-buttons { margin-bottom: 20px; }
+    #brand-buttons button { margin-right: 10px; }
+    #stats-tab { display: none; }
+    .stats-container { display: flex; gap: 30px; align-items: flex-start; margin-top: 20px; }
+    .stat-block { flex: 1; background: #fff; padding: 16px; border: 1px solid #ddd; border-radius: 6px; }
+    .charts-container { display: flex; justify-content: space-between; margin-top: 20px; gap: 30px; }
+    .charts-container canvas { background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
+    .pdf-btn { margin-top: 10px; display: inline-block; }
   </style>
 </head>
 <body>
@@ -42,9 +42,8 @@
     <button id="btn-stats" onclick="showStats()">Stats</button>
   </div>
 
-  <p><a href="/download">📥 Download CSV</a></p>
+  <p id="download-link"><a href="/download">📥 Download CSV</a></p>
 
-  <!-- Mentions View -->
   <div id="mentions-tab">
     <table id="data-table">
       <thead>
@@ -63,16 +62,18 @@
     </table>
   </div>
 
-  <!-- Stats View -->
-  <div id="stats-tab" style="display: none;">
-    <h2>Brand Stats</h2>
-    <div style="display: flex; gap: 40px;">
-      <div id="stats-left" class="stat-block" style="flex: 1;"></div>
-      <div id="stats-right" class="stat-block" style="flex: 1;"></div>
+  <div id="stats-tab">
+    <h2>Head to head stats</h2>
+    <div class="stats-container">
+      <div id="stats-left" class="stat-block"></div>
+      <div id="stats-right" class="stat-block"></div>
     </div>
-    <div style="display: flex; gap: 40px;">
-      <canvas id="pie-left"></canvas>
-      <canvas id="pie-right"></canvas>
+    <div class="charts-container">
+      <canvas id="pie-left" width="250" height="250"></canvas>
+      <canvas id="pie-right" width="250" height="250"></canvas>
+    </div>
+    <div class="pdf-btn">
+      <button onclick="downloadPDF()">📄 Download as PDF</button>
     </div>
   </div>
 
@@ -86,6 +87,7 @@
       document.getElementById("btn-badinka").disabled = (brand === "badinka");
       document.getElementById("btn-iheartraves").disabled = (brand === "iheartraves");
       document.getElementById("btn-stats").disabled = false;
+      document.getElementById("download-link").innerHTML = '<a href="/download">📥 Download CSV</a>';
       loadData();
     }
 
@@ -95,6 +97,7 @@
       document.getElementById("btn-badinka").disabled = false;
       document.getElementById("btn-iheartraves").disabled = false;
       document.getElementById("btn-stats").disabled = true;
+      document.getElementById("download-link").innerHTML = '';
       loadStats();
     }
 
@@ -117,15 +120,7 @@
               <td>${item.subreddit}</td>
               <td>${item.author}</td>
               <td><a href="${item.permalink}" target="_blank">View</a></td>
-              <td>${new Date(item.created).toLocaleString("en-GB", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  hour12: false
-                }).replace(/\//g, ".")}</td>
+              <td>${new Date(item.created).toLocaleString("en-GB")}</td>
               <td>${item.body || item.title || ""}</td>
               <td>${sentimentBadge}</td>
               <td><button onclick="deleteEntry('${item.id}')">🗑️ Delete</button></td>
@@ -147,24 +142,28 @@
     }
 
     function loadStats() {
-      fetch(`/stats?brand=badinka`)
-        .then(res => res.json())
-        .then(data => renderStats(data, "left"));
-
-      fetch(`/stats?brand=iheartraves`)
-        .then(res => res.json())
-        .then(data => renderStats(data, "right"));
+      fetch(`/stats?brand=badinka`).then(res => res.json()).then(data => renderStats(data, "left"));
+      fetch(`/stats?brand=iheartraves`).then(res => res.json()).then(data => renderStats(data, "right"));
     }
 
     function renderStats(data, side) {
+      const totalMentionsToday = data.daily.posts + data.daily.comments;
+      const totalMentionsAll = data.total.posts + data.total.comments;
+
       const container = document.getElementById(`stats-${side}`);
       container.innerHTML = `
-        <h3>${data.brand === "badinka" ? "My Brand" : "My Competitor"}</h3>
-        <p><strong>Posts made today:</strong> ${data.daily.posts}</p>
-        <p><strong>Comments made today:</strong> ${data.daily.comments}</p>
-        <p><strong>Total Posts:</strong> ${data.total.posts}</p>
-        <p><strong>Total Comments:</strong> ${data.total.comments}</p>
-        <p><strong>Perception Score:</strong> ${data.score}/100</p>
+        <h3>${data.display_name}</h3>
+        <table>
+          <tr><th colspan="2">Today</th></tr>
+          <tr><td>Posts</td><td>${data.daily.posts}</td></tr>
+          <tr><td>Comments</td><td>${data.daily.comments}</td></tr>
+          <tr><td><strong>Total Today</strong></td><td><strong>${totalMentionsToday}</strong></td></tr>
+          <tr><th colspan="2">All Time</th></tr>
+          <tr><td>Posts</td><td>${data.total.posts}</td></tr>
+          <tr><td>Comments</td><td>${data.total.comments}</td></tr>
+          <tr><td><strong>Total</strong></td><td><strong>${totalMentionsAll}</strong></td></tr>
+          <tr><td>Perception Score</td><td>${data.score}/100</td></tr>
+        </table>
       `;
 
       const ctx = document.getElementById(`pie-${side}`).getContext("2d");
@@ -173,25 +172,29 @@
         data: {
           labels: ["Positive", "Neutral", "Negative"],
           datasets: [{
-            data: [
-              data.sentiment.positive,
-              data.sentiment.neutral,
-              data.sentiment.negative
-            ],
+            data: [data.sentiment.positive, data.sentiment.neutral, data.sentiment.negative],
             backgroundColor: ["limegreen", "gray", "red"]
           }]
         },
         options: {
           responsive: true,
-          plugins: {
-            legend: { position: "bottom" },
-            title: { display: false }
-          }
+          plugins: { legend: { position: "bottom" } }
         }
       });
     }
 
-    // Initial state
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text("Reddit Brand Monitoring - Head to Head Stats", 10, 10);
+      doc.html(document.querySelector("#stats-tab"), {
+        callback: function (doc) {
+          doc.save("brand-stats.pdf");
+        },
+        x: 10, y: 20
+      });
+    }
+
     switchBrand(currentBrand);
     setInterval(loadData, 30000);
   </script>
