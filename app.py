@@ -121,7 +121,7 @@ def weekly_mentions():
     # Query mentions grouped by user-local date
     cur.execute("""
         SELECT 
-            (timezone(%s, created))::date AS local_day
+            (timezone(%s, created))::date AS local_day, 
             COUNT(*) 
         FROM mentions 
         WHERE brand = %s AND created >= %s AND created < %s
