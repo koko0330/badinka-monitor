@@ -133,7 +133,7 @@ def weekly_mentions():
     cur.close()
     conn.close()
 
-    data = {row[0].isoformat(): row[1] for row in rows}
+    data = {row[0].strftime("%Y-%m-%d"): row[1] for row in rows}
     return jsonify(data)
 
 @app.route("/download")
