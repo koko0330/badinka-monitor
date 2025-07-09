@@ -37,7 +37,7 @@
     <button id="btn-iheartraves" onclick="switchBrand('iheartraves')">My Competitor</button>
     <button id="btn-stats" onclick="showStats()">Stats</button>
   </div>
-  <p id="download-link" class="csv-btn">
+  <p class="csv-btn">
     <button id="csv-btn" onclick="window.location.href='/download'">📥 Download CSV</button>
     <button id="pdf-btn" style="display:none;" onclick="downloadPDF()">📄 Download as PDF</button>
   </p>
@@ -93,9 +93,7 @@
   </div>
 
   <script>
-    const leftBrand = "badinka";
-    const rightBrand = "iheartraves";
-    let currentBrand = leftBrand;
+    let currentBrand = "badinka";
     let charts = {};
     let barCharts = { left: null, right: null };
     let weekOffset = 0;
@@ -179,9 +177,9 @@
     }
 
     function loadStats() {
-      const tz = new Date().getTimezoneOffset();
-      fetch(`/stats?brand=${leftBrand}&tz_offset=${tz}`).then(res => res.json()).then(data => renderStats(data, "left"));
-      fetch(`/stats?brand=${rightBrand}&tz_offset=${tz}`).then(res => res.json()).then(data => renderStats(data, "right"));
+      const tzOffset = new Date().getTimezoneOffset();
+      fetch(`/stats?brand=badinka&tz_offset=${tzOffset}`).then(res => res.json()).then(data => renderStats(data, "left"));
+      fetch(`/stats?brand=iheartraves&tz_offset=${tzOffset}`).then(res => res.json()).then(data => renderStats(data, "right"));
       loadWeeklyCharts();
     }
 
@@ -221,7 +219,7 @@
     }
 
     function loadWeeklyCharts() {
-      const tz = new Date().getTimezoneOffset();
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const monday = getMonday(weekOffset);
       updateWeekLabel(monday);
 
@@ -233,14 +231,11 @@
       });
 
       const labels = days.map(d => d.toLocaleDateString());
-      const keys = days.map(d => {
-        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-        return local.toISOString().split("T")[0];
-      });
+      const keys = days.map(d => d.toISOString().split("T")[0]);
 
       Promise.all([
-        fetch(`/weekly_mentions?brand=${leftBrand}&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json()),
-        fetch(`/weekly_mentions?brand=${rightBrand}&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json())
+        fetch(`/weekly_mentions?brand=badinka&tz=${tz}&week_offset=${weekOffset}`).then(res => res.json()),
+        fetch(`/weekly_mentions?brand=iheartraves&tz=${tz}&week_offset=${weekOffset}`).then(res => res.json())
       ]).then(([leftData, rightData]) => {
         const leftValues = keys.map(key => leftData[key] || 0);
         const rightValues = keys.map(key => rightData[key] || 0);
