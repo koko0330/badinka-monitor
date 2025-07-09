@@ -93,7 +93,9 @@
   </div>
 
   <script>
-    let currentBrand = "badinka";
+    const leftBrand = "badinka";
+    const rightBrand = "iheartraves";
+    let currentBrand = leftBrand;
     let charts = {};
     let barCharts = { left: null, right: null };
     let weekOffset = 0;
@@ -178,8 +180,8 @@
 
     function loadStats() {
       const tz = new Date().getTimezoneOffset();
-      fetch(`/stats?brand=badinka&tz_offset=${tz}`).then(res => res.json()).then(data => renderStats(data, "left"));
-      fetch(`/stats?brand=iheartraves&tz_offset=${tz}`).then(res => res.json()).then(data => renderStats(data, "right"));
+      fetch(`/stats?brand=${leftBrand}&tz_offset=${tz}`).then(res => res.json()).then(data => renderStats(data, "left"));
+      fetch(`/stats?brand=${rightBrand}&tz_offset=${tz}`).then(res => res.json()).then(data => renderStats(data, "right"));
       loadWeeklyCharts();
     }
 
@@ -231,11 +233,14 @@
       });
 
       const labels = days.map(d => d.toLocaleDateString());
-      const keys = days.map(d => d.toISOString().split("T")[0]);
+      const keys = days.map(d => {
+        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+        return local.toISOString().split("T")[0];
+      });
 
       Promise.all([
-        fetch(`/weekly_mentions?brand=badinka&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json()),
-        fetch(`/weekly_mentions?brand=iheartraves&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json())
+        fetch(`/weekly_mentions?brand=${leftBrand}&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json()),
+        fetch(`/weekly_mentions?brand=${rightBrand}&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json())
       ]).then(([leftData, rightData]) => {
         const leftValues = keys.map(key => leftData[key] || 0);
         const rightValues = keys.map(key => rightData[key] || 0);
