@@ -95,9 +95,6 @@ def get_stats():
         "score": score
     })
 
-    brand = request.args.get("brand", "badinka")
-
-
 @app.route("/weekly_mentions")
 def weekly_mentions():
     brand = request.args.get("brand", "badinka")
@@ -108,7 +105,7 @@ def weekly_mentions():
     user_now = now_utc - timedelta(minutes=tz_offset)
 
     # Get user's local Monday of the desired week
-    monday = user_now - timedelta(days=(user_now.weekday())) + timedelta(weeks=week_offset)
+    monday = user_now - timedelta(days=user_now.weekday()) + timedelta(weeks=week_offset)
     monday = monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Convert user's Monday 00:00 to UTC for query range
@@ -132,7 +129,6 @@ def weekly_mentions():
 
     data = {row[0].isoformat(): row[1] for row in rows}
     return jsonify(data)
-
 
 @app.route("/download")
 def download_csv():
