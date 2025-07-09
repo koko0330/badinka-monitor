@@ -89,6 +89,7 @@
     }
 
     function showStats() {
+      const tzOffset = new Date().getTimezoneOffset(); // in minutes
       document.getElementById("mentions-tab").style.display = "none";
       document.getElementById("stats-tab").style.display = "block";
       document.getElementById("btn-badinka").disabled = false;
@@ -96,7 +97,8 @@
       document.getElementById("btn-stats").disabled = true;
       document.getElementById("csv-btn").style.display = 'none';
       document.getElementById("pdf-btn").style.display = 'inline-block';
-      loadStats();
+      fetch(`/stats?brand=badinka&tz_offset=${tzOffset}`).then(res => res.json()).then(data => renderStats(data, "left"));
+      fetch(`/stats?brand=iheartraves&tz_offset=${tzOffset}`).then(res => res.json()).then(data => renderStats(data, "right"));
     }
 
     function loadData() {
@@ -105,20 +107,17 @@
         .then(data => {
           const tbody = document.querySelector("#data-table tbody");
           tbody.innerHTML = "";
-
           data.sort((a, b) => new Date(b.created) - new Date(a.created));
-
           data.forEach(item => {
             const sentiment = item.sentiment || "neutral";
             const sentimentBadge = `<span class="badge ${sentiment}">${sentiment}</span>`;
-
             const row = document.createElement("tr");
             row.innerHTML = `
               <td>${item.type}</td>
               <td>${item.subreddit}</td>
               <td>${item.author}</td>
               <td><a href="${item.permalink}" target="_blank">View</a></td>
-              <td>${new Date(item.created).toLocaleString("en-GB")}</td>
+              <td>${new Date(item.created).toLocaleString()}</td>
               <td>${item.body || item.title || ""}</td>
               <td>${sentimentBadge}</td>
               <td><button onclick="deleteEntry('${item.id}')">🗑️ Delete</button></td>
@@ -134,24 +133,16 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id })
-      })
-      .then(res => res.json())
-      .then(() => loadData());
-    }
-
-    function loadStats() {
-      fetch(`/stats?brand=badinka`).then(res => res.json()).then(data => renderStats(data, "left"));
-      fetch(`/stats?brand=iheartraves`).then(res => res.json()).then(data => renderStats(data, "right"));
+      }).then(res => res.json()).then(() => loadData());
     }
 
     function renderStats(data, side) {
       const totalMentionsToday = data.daily.posts + data.daily.comments;
       const totalMentionsAll = data.total.posts + data.total.comments;
-
       const perceptionClass = data.score > 60 ? 'positive' : data.score >= 40 ? 'neutral' : 'negative';
       const container = document.getElementById(`stats-${side}`);
       container.innerHTML = `
-        <h3>${data.display_name || data.brand || 'Unknown Brand'}</h3>
+        <h3>${data.brand}</h3>
         <table>
           <tr><th colspan="2">Today</th></tr>
           <tr><td>Posts</td><td>${data.daily.posts}</td></tr>
