@@ -1,7 +1,6 @@
 from flask import Flask, render_template, jsonify, request, send_file
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 import os
-import pytz
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -42,7 +41,6 @@ def delete_mention():
     conn.commit()
     cur.close()
     conn.close()
-
     return jsonify({"status": "deleted", "id": mention_id})
 
 @app.route("/stats")
@@ -52,22 +50,25 @@ def get_stats():
 
     now_utc = datetime.utcnow()
     user_now = now_utc - timedelta(minutes=tz_offset)
-    user_start_of_day = user_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    start_of_day_utc = user_start_of_day + timedelta(minutes=tz_offset)
+    user_start = user_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_day_utc = user_start + timedelta(minutes=tz_offset)
 
     conn = get_db_connection()
     cur = conn.cursor()
 
+    # Daily
     cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'post' AND created >= %s", (brand, start_of_day_utc))
     daily_posts = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'comment' AND created >= %s", (brand, start_of_day_utc))
     daily_comments = cur.fetchone()[0]
 
+    # All Time
     cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'post'", (brand,))
     total_posts = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'comment'", (brand,))
     total_comments = cur.fetchone()[0]
 
+    # Sentiment
     cur.execute("""
         SELECT sentiment, COUNT(*) 
         FROM mentions 
@@ -109,7 +110,6 @@ def weekly_mentions():
 
     conn = get_db_connection()
     cur = conn.cursor()
-
     cur.execute("""
         SELECT DATE(created AT TIME ZONE 'UTC') AS day, COUNT(*) 
         FROM mentions 
@@ -117,7 +117,6 @@ def weekly_mentions():
         GROUP BY day
         ORDER BY day
     """, (brand, start_utc, end_utc))
-
     rows = cur.fetchall()
     cur.close()
     conn.close()
