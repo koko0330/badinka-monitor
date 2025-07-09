@@ -74,17 +74,17 @@
       <tr>
         <td>
           <div style="text-align: center; margin-top: 30px;">
-            <button onclick="changeWeek(1)">⬅️ Previous Week</button>
+            <button onclick="changeWeek(-1)">⬅️ Previous Week</button>
             <span id="week-label-left" style="margin: 0 20px; font-weight: bold;">This Week</span>
-            <button onclick="changeWeek(-1)">Next Week ➡️</button>
+            <button onclick="changeWeek(1)">Next Week ➡️</button>
           </div>
           <canvas id="bar-left" style="margin-top: 20px; height: 300px;"></canvas>
         </td>
         <td>
           <div style="text-align: center; margin-top: 30px;">
-            <button onclick="changeWeek(1)">⬅️ Previous Week</button>
+            <button onclick="changeWeek(-1)">⬅️ Previous Week</button>
             <span id="week-label-right" style="margin: 0 20px; font-weight: bold;">This Week</span>
-            <button onclick="changeWeek(-1)">Next Week ➡️</button>
+            <button onclick="changeWeek(1)">Next Week ➡️</button>
           </div>
           <canvas id="bar-right" style="margin-top: 20px; height: 300px;"></canvas>
         </td>
@@ -121,23 +121,25 @@
       loadStats();
     }
 
-    function updateWeekLabel() {
-      const now = new Date();
-      const monday = new Date(now);
-      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + (weekOffset * 7));
+    function changeWeek(offset) {
+      weekOffset += offset;
+      loadWeeklyCharts();
+    }
+
+    function getMonday(offset) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const monday = new Date(today);
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + 7 * offset);
+      return monday;
+    }
+
+    function updateWeekLabel(monday) {
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
-    
       const label = `${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`;
       document.getElementById("week-label-left").textContent = label;
       document.getElementById("week-label-right").textContent = label;
-    }
-
-
-    function changeWeek(offset) {
-      weekOffset += offset;
-      updateWeekLabel();
-      loadWeeklyCharts();
     }
 
     function loadData() {
@@ -178,7 +180,6 @@
       const tz = new Date().getTimezoneOffset();
       fetch(`/stats?brand=badinka&tz_offset=${tz}`).then(res => res.json()).then(data => renderStats(data, "left"));
       fetch(`/stats?brand=iheartraves&tz_offset=${tz}`).then(res => res.json()).then(data => renderStats(data, "right"));
-      updateWeekLabel();
       loadWeeklyCharts();
     }
 
@@ -208,7 +209,10 @@
         type: "pie",
         data: {
           labels: ["Positive", "Neutral", "Negative"],
-          datasets: [{ data: [data.sentiment.positive, data.sentiment.neutral, data.sentiment.negative], backgroundColor: ["limegreen", "gray", "red"] }]
+          datasets: [{
+            data: [data.sentiment.positive, data.sentiment.neutral, data.sentiment.negative],
+            backgroundColor: ["limegreen", "gray", "red"]
+          }]
         },
         options: { plugins: { legend: { position: "bottom" } }, responsive: true }
       });
@@ -216,33 +220,29 @@
 
     function loadWeeklyCharts() {
       const tz = new Date().getTimezoneOffset();
+      const monday = getMonday(weekOffset);
+      updateWeekLabel(monday);
+
+      const days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        return d;
+      });
+
+      const labels = days.map(d => d.toLocaleDateString());
+      const keys = days.map(d => d.toISOString().split("T")[0]);
+
       Promise.all([
         fetch(`/weekly_mentions?brand=badinka&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json()),
         fetch(`/weekly_mentions?brand=iheartraves&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json())
       ]).then(([leftData, rightData]) => {
-        const base = new Date();
-        base.setHours(0, 0, 0, 0);
-        const monday = new Date(base);
-        monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + (weekOffset * 7));
-    
-        const days = Array.from({ length: 7 }, (_, i) => {
-          const d = new Date(monday);
-          d.setDate(monday.getDate() + i);
-          return d;
-        });
-    
-        const labels = days.map(d => d.toLocaleDateString());
-        const keys = days.map(d => d.toISOString().split("T")[0]);
-    
         const leftValues = keys.map(key => leftData[key] || 0);
         const rightValues = keys.map(key => rightData[key] || 0);
-        const maxY = Math.max(...leftValues, ...rightValues, 1); // prevent max = 0
-    
+        const maxY = Math.max(...leftValues, ...rightValues, 1);
         drawBarChart("left", labels, leftValues, maxY);
         drawBarChart("right", labels, rightValues, maxY);
       });
     }
-
 
     function drawBarChart(side, labels, values, maxY) {
       const ctx = document.getElementById(`bar-${side}`).getContext("2d");
@@ -265,11 +265,6 @@
           }
         }
       });
-    }
-
-    function toISODate(dateStr) {
-      const d = new Date(dateStr);
-      return d.toISOString().split("T")[0];
     }
 
     function downloadPDF() {
