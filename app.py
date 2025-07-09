@@ -1,5 +1,5 @@
 from flask import Flask, render_template, jsonify, request, send_file
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import os
 import pytz
 import psycopg2
@@ -48,29 +48,26 @@ def delete_mention():
 @app.route("/stats")
 def get_stats():
     brand = request.args.get("brand", "badinka")
+    tz_offset = int(request.args.get("tz_offset", "0"))  # in minutes
 
-    # Get start of "today" in Europe/Sofia and convert to UTC
-    local_tz = pytz.timezone("Europe/Sofia")
-    now_local = datetime.now(local_tz)
-    start_of_day_local = datetime.combine(now_local.date(), time.min).replace(tzinfo=local_tz)
-    start_of_day_utc = start_of_day_local.astimezone(pytz.utc)
+    now_utc = datetime.utcnow()
+    user_now = now_utc - timedelta(minutes=tz_offset)
+    user_start_of_day = user_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_day_utc = user_start_of_day + timedelta(minutes=tz_offset)
 
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # --- Daily Mentions ---
     cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'post' AND created >= %s", (brand, start_of_day_utc))
     daily_posts = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'comment' AND created >= %s", (brand, start_of_day_utc))
     daily_comments = cur.fetchone()[0]
 
-    # --- Total Mentions ---
     cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'post'", (brand,))
     total_posts = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM mentions WHERE brand = %s AND type = 'comment'", (brand,))
     total_comments = cur.fetchone()[0]
 
-    # --- Sentiment Counts ---
     cur.execute("""
         SELECT sentiment, COUNT(*) 
         FROM mentions 
@@ -82,13 +79,11 @@ def get_stats():
     cur.close()
     conn.close()
 
-    # Fill missing sentiments
     pos = sentiment_counts.get("positive", 0)
     neu = sentiment_counts.get("neutral", 0)
     neg = sentiment_counts.get("negative", 0)
     total = pos + neu + neg
 
-    # Perception score (0-100)
     score = round((pos * 100 + neu * 50 + neg * 0) / total) if total > 0 else 0
 
     return jsonify({
