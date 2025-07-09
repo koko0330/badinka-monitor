@@ -98,23 +98,27 @@ def get_stats():
 @app.route("/weekly_mentions")
 def weekly_mentions():
     brand = request.args.get("brand", "badinka")
-    tz = request.args.get("tz", "UTC")  # timezone name like 'Europe/Sofia'
+    tz = request.args.get("tz", "UTC")
     week_offset = int(request.args.get("week_offset", "0"))
 
-    # Get start and end of the selected week in UTC
+    # Get current UTC time
     now_utc = datetime.utcnow()
-    # Assume Monday is the start of the week
-    user_now = now_utc
-    monday = user_now - timedelta(days=user_now.weekday()) + timedelta(weeks=week_offset)
-    monday = monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    start_utc = monday
-    end_utc = start_utc + timedelta(days=7)
-
+    # Convert current UTC to user's local time to find local Monday
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Proper time zone conversion using AT TIME ZONE 'UTC' AT TIME ZONE %s
+    cur.execute("SELECT (%s AT TIME ZONE 'UTC' AT TIME ZONE %s)::timestamp", (now_utc, tz))
+    user_now_local = cur.fetchone()[0]
+    local_monday = user_now_local - timedelta(days=user_now_local.weekday()) + timedelta(weeks=week_offset)
+    local_monday = local_monday.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Convert local Monday back to UTC to get correct query window
+    cur.execute("SELECT (%s AT TIME ZONE %s AT TIME ZONE 'UTC')::timestamp", (local_monday, tz))
+    start_utc = cur.fetchone()[0]
+    end_utc = start_utc + timedelta(days=7)
+
+    # Query mentions grouped by user-local date
     cur.execute("""
         SELECT 
             (created AT TIME ZONE 'UTC' AT TIME ZONE %s)::date AS local_day, 
