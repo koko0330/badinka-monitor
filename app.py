@@ -95,34 +95,8 @@ def get_stats():
         "score": score
     })
 
-@app.route("/weekly_mentions")
-def weekly_mentions():
     brand = request.args.get("brand", "badinka")
-    tz_offset = int(request.args.get("tz_offset", "0"))
-    week_offset = int(request.args.get("week_offset", "0"))
 
-    now_utc = datetime.utcnow()
-    user_now = now_utc - timedelta(minutes=tz_offset)
-    start_of_week = user_now - timedelta(days=(user_now.weekday())) + timedelta(weeks=week_offset)
-    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
-    start_utc = start_of_week + timedelta(minutes=tz_offset)
-    end_utc = start_utc + timedelta(days=7)
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT (created AT TIME ZONE 'UTC' AT TIME ZONE 'UTC' - INTERVAL '%s minutes')::date AS local_day, COUNT(*)
-        FROM mentions
-        WHERE brand = %s AND created >= %s AND created < %s
-        GROUP BY local_day ORDER BY local_day
-    """, (tz_offset, brand, start_utc, end_utc))
-
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    data = {row[0].isoformat(): row[1] for row in rows}
-    return jsonify(data)
 
 @app.route("/download")
 def download_csv():
