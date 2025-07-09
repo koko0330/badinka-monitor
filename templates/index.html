@@ -229,7 +229,11 @@
         return d;
       });
 
-      const labels = days.map(d => d.toLocaleDateString());
+      const labels = days.map(d => {
+        const adjusted = new Date(d);
+        adjusted.setDate(adjusted.getDate() - 1); // Fix the +1 day issue
+        return adjusted.toLocaleDateString();
+      });
       const keys = days.map(d => d.toISOString().split("T")[0]);
 
       Promise.all([
