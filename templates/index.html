@@ -123,13 +123,16 @@
 
     function updateWeekLabel() {
       const now = new Date();
-      const monday = new Date(now.setDate(now.getDate() - now.getDay() + 1 - 7 * weekOffset));
+      const monday = new Date(now);
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + (weekOffset * 7));
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
+    
       const label = `${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`;
       document.getElementById("week-label-left").textContent = label;
       document.getElementById("week-label-right").textContent = label;
     }
+
 
     function changeWeek(offset) {
       weekOffset += offset;
@@ -217,12 +220,15 @@
         fetch(`/weekly_mentions?brand=badinka&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json()),
         fetch(`/weekly_mentions?brand=iheartraves&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json())
       ]).then(([leftData, rightData]) => {
+        const base = new Date();
+        base.setHours(0, 0, 0, 0);
+        const monday = new Date(base);
+        monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + (weekOffset * 7));
+    
         const days = Array.from({ length: 7 }, (_, i) => {
-          const d = new Date();
-          d.setHours(0, 0, 0, 0);
-          const current = new Date(d);
-          current.setDate(current.getDate() - current.getDay() + i + (weekOffset * 7));
-          return current;
+          const d = new Date(monday);
+          d.setDate(monday.getDate() + i);
+          return d;
         });
     
         const labels = days.map(d => d.toLocaleDateString());
@@ -230,7 +236,7 @@
     
         const leftValues = keys.map(key => leftData[key] || 0);
         const rightValues = keys.map(key => rightData[key] || 0);
-        const maxY = Math.max(...leftValues, ...rightValues) + 1;
+        const maxY = Math.max(...leftValues, ...rightValues, 1); // prevent max = 0
     
         drawBarChart("left", labels, leftValues, maxY);
         drawBarChart("right", labels, rightValues, maxY);
