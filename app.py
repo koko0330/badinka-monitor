@@ -103,7 +103,7 @@ def weekly_mentions():
 
     now_utc = datetime.utcnow()
     user_now = now_utc - timedelta(minutes=tz_offset)
-    start_of_week = user_now - timedelta(days=user_now.weekday(), weeks=week_offset)
+    start_of_week = user_now - timedelta(days=(user_now.weekday())) + timedelta(weeks=week_offset)
     start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
     start_utc = start_of_week + timedelta(minutes=tz_offset)
     end_utc = start_utc + timedelta(days=7)
@@ -111,12 +111,12 @@ def weekly_mentions():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT DATE(created AT TIME ZONE 'UTC') AS day, COUNT(*) 
-        FROM mentions 
+        SELECT (created AT TIME ZONE 'UTC' AT TIME ZONE 'UTC' - INTERVAL '%s minutes')::date AS local_day, COUNT(*)
+        FROM mentions
         WHERE brand = %s AND created >= %s AND created < %s
-        GROUP BY day
-        ORDER BY day
-    """, (brand, start_utc, end_utc))
+        GROUP BY local_day ORDER BY local_day
+    """, (tz_offset, brand, start_utc, end_utc))
+
     rows = cur.fetchall()
     cur.close()
     conn.close()
