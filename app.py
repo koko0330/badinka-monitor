@@ -98,33 +98,32 @@ def get_stats():
 @app.route("/weekly_mentions")
 def weekly_mentions():
     brand = request.args.get("brand", "badinka")
-    tz_offset = int(request.args.get("tz_offset", "0"))  # in minutes
+    tz = request.args.get("tz", "UTC")  # timezone name like 'Europe/Sofia'
     week_offset = int(request.args.get("week_offset", "0"))
 
+    # Get start and end of the selected week in UTC
     now_utc = datetime.utcnow()
-    user_now = now_utc - timedelta(minutes=tz_offset)
-
-    # Get user's local Monday of the desired week
+    # Assume Monday is the start of the week
+    user_now = now_utc
     monday = user_now - timedelta(days=user_now.weekday()) + timedelta(weeks=week_offset)
     monday = monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # Convert user's Monday 00:00 to UTC for query range
-    start_utc = monday + timedelta(minutes=tz_offset)
+    start_utc = monday
     end_utc = start_utc + timedelta(days=7)
 
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Use tz_offset to get local day correctly from UTC created time
+    # Proper time zone conversion using AT TIME ZONE 'UTC' AT TIME ZONE %s
     cur.execute("""
         SELECT 
-            (created AT TIME ZONE 'UTC' + interval '%s minutes')::date AS local_day,
+            (created AT TIME ZONE 'UTC' AT TIME ZONE %s)::date AS local_day, 
             COUNT(*) 
         FROM mentions 
         WHERE brand = %s AND created >= %s AND created < %s
         GROUP BY local_day
-        ORDER BY local_day;
-    """, (tz_offset, brand, start_utc, end_utc))
+        ORDER BY local_day
+    """, (tz, brand, start_utc, end_utc))
 
     rows = cur.fetchall()
     cur.close()
