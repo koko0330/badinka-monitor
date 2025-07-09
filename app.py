@@ -101,39 +101,34 @@ def weekly_mentions():
     tz_offset = int(request.args.get("tz_offset", "0"))  # in minutes
     week_offset = int(request.args.get("week_offset", "0"))
 
+    # Calculate the user's local Monday in UTC
     now_utc = datetime.utcnow()
     user_now = now_utc - timedelta(minutes=tz_offset)
-
-    # Get local Monday for the desired week
     monday = user_now - timedelta(days=user_now.weekday()) + timedelta(weeks=week_offset)
     monday = monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # Query range in UTC
     start_utc = monday + timedelta(minutes=tz_offset)
     end_utc = start_utc + timedelta(days=7)
 
     conn = get_db_connection()
     cur = conn.cursor()
 
+    # Convert created from UTC to local time using offset, then extract date
     cur.execute("""
-        SELECT created::date, COUNT(*)
+        SELECT 
+            (created AT TIME ZONE 'UTC' + interval '%s minutes')::date AS local_day, 
+            COUNT(*) 
         FROM mentions 
         WHERE brand = %s AND created >= %s AND created < %s
-        GROUP BY created::date
-        ORDER BY created::date
-    """, (brand, start_utc, end_utc))
+        GROUP BY local_day
+        ORDER BY local_day
+    """, (tz_offset, brand, start_utc, end_utc))
 
     rows = cur.fetchall()
     cur.close()
     conn.close()
 
-    # Adjust UTC date to local day
-    data = {}
-    for row in rows:
-        utc_day = row[0]
-        local_day = utc_day - timedelta(minutes=tz_offset)
-        data[local_day.isoformat()] = row[1]
-
+    data = {row[0].isoformat(): row[1] for row in rows}
     return jsonify(data)
 
 @app.route("/download")
