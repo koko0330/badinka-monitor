@@ -231,7 +231,7 @@
       });
 
       const labels = days.map(d => d.toLocaleDateString());
-      const keys = days.map(d => d.toISOString().split("T")[0]);
+      const keys = days.map(d => d.toLocaleDateString('en-CA'));  // en-CA = YYYY-MM-DD
 
       Promise.all([
         fetch(`/weekly_mentions?brand=badinka&tz=${tz}&week_offset=${weekOffset}`).then(res => res.json()),
