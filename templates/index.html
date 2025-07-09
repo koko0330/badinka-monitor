@@ -226,14 +226,11 @@
       const days = Array.from({ length: 7 }, (_, i) => {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
+        d.setHours(0, 0, 0, 0);
         return d;
       });
 
-      const labels = days.map(d => {
-        const adjusted = new Date(d);
-        adjusted.setDate(adjusted.getDate() - 1); // Fix the +1 day issue
-        return adjusted.toLocaleDateString();
-      });
+      const labels = days.map(d => d.toLocaleDateString());
       const keys = days.map(d => d.toISOString().split("T")[0]);
 
       Promise.all([
