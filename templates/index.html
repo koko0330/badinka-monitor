@@ -217,14 +217,18 @@
         fetch(`/weekly_mentions?brand=badinka&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json()),
         fetch(`/weekly_mentions?brand=iheartraves&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json())
       ]).then(([leftData, rightData]) => {
-        const labels = Array.from({ length: 7 }, (_, i) => {
+        const days = Array.from({ length: 7 }, (_, i) => {
           const d = new Date();
+          d.setHours(0, 0, 0, 0);
           d.setDate(d.getDate() - d.getDay() + i - 7 * weekOffset);
-          return d.toLocaleDateString();
+          return d;
         });
-
-        const leftValues = labels.map(label => leftData[toISODate(label)] || 0);
-        const rightValues = labels.map(label => rightData[toISODate(label)] || 0);
+        
+        const labels = days.map(d => d.toLocaleDateString());
+        const keys = days.map(d => d.toISOString().split("T")[0]);
+        
+        const leftValues = keys.map(key => leftData[key] || 0);
+        const rightValues = keys.map(key => rightData[key] || 0);
         const maxY = Math.max(...leftValues, ...rightValues) + 1;
 
         drawBarChart("left", labels, leftValues, maxY);
