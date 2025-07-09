@@ -74,17 +74,17 @@
       <tr>
         <td>
           <div style="text-align: center; margin-top: 30px;">
-            <button onclick="changeWeek(-1)">⬅️ Previous Week</button>
+            <button onclick="changeWeek(1)">⬅️ Previous Week</button>
             <span id="week-label-left" style="margin: 0 20px; font-weight: bold;">This Week</span>
-            <button onclick="changeWeek(1)">Next Week ➡️</button>
+            <button onclick="changeWeek(-1)">Next Week ➡️</button>
           </div>
           <canvas id="bar-left" style="margin-top: 20px; height: 300px;"></canvas>
         </td>
         <td>
           <div style="text-align: center; margin-top: 30px;">
-            <button onclick="changeWeek(-1)">⬅️ Previous Week</button>
+            <button onclick="changeWeek(1)">⬅️ Previous Week</button>
             <span id="week-label-right" style="margin: 0 20px; font-weight: bold;">This Week</span>
-            <button onclick="changeWeek(1)">Next Week ➡️</button>
+            <button onclick="changeWeek(-1)">Next Week ➡️</button>
           </div>
           <canvas id="bar-right" style="margin-top: 20px; height: 300px;"></canvas>
         </td>
@@ -220,21 +220,23 @@
         const days = Array.from({ length: 7 }, (_, i) => {
           const d = new Date();
           d.setHours(0, 0, 0, 0);
-          d.setDate(d.getDate() - d.getDay() + i - 7 * weekOffset);
-          return d;
+          const current = new Date(d);
+          current.setDate(current.getDate() - current.getDay() + i + (weekOffset * 7));
+          return current;
         });
-        
+    
         const labels = days.map(d => d.toLocaleDateString());
         const keys = days.map(d => d.toISOString().split("T")[0]);
-        
+    
         const leftValues = keys.map(key => leftData[key] || 0);
         const rightValues = keys.map(key => rightData[key] || 0);
         const maxY = Math.max(...leftValues, ...rightValues) + 1;
-
+    
         drawBarChart("left", labels, leftValues, maxY);
         drawBarChart("right", labels, rightValues, maxY);
       });
     }
+
 
     function drawBarChart(side, labels, values, maxY) {
       const ctx = document.getElementById(`bar-${side}`).getContext("2d");
