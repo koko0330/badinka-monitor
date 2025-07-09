@@ -70,22 +70,32 @@
         <td><canvas id="pie-right"></canvas></td>
       </tr>
       <tr>
-        <td colspan="2">
-          <div style="text-align: center; margin-top: 30px;">
-            <button onclick="changeWeek(-1)">⬅️ Previous Week</button>
-            <span id="week-label" style="margin: 0 20px; font-weight: bold;">This Week</span>
-            <button onclick="changeWeek(1)">Next Week ➡️</button>
+        <td>
+          <div style="margin-top:20px;">
+            <button onclick="changeWeek('left', -1)">⬅️ Previous Week</button>
+            <span id="week-label-left" style="margin: 0 20px; font-weight: bold;">This Week</span>
+            <button onclick="changeWeek('left', 1)">Next Week ➡️</button>
           </div>
-          <canvas id="bar-weekly" style="margin-top: 20px; height: 300px;"></canvas>
+          <canvas id="bar-weekly-left" style="margin-top: 20px; height: 300px;"></canvas>
+        </td>
+        <td>
+          <div style="margin-top:20px;">
+            <button onclick="changeWeek('right', -1)">⬅️ Previous Week</button>
+            <span id="week-label-right" style="margin: 0 20px; font-weight: bold;">This Week</span>
+            <button onclick="changeWeek('right', 1)">Next Week ➡️</button>
+          </div>
+          <canvas id="bar-weekly-right" style="margin-top: 20px; height: 300px;"></canvas>
         </td>
       </tr>
     </table>
   </div>
+
   <script>
     let currentBrand = "badinka";
     let charts = {};
-    let weekOffset = 0;
-    let barChart;
+    let weekOffsets = { left: 0, right: 0 };
+    let barCharts = { left: null, right: null };
+    const brandMap = { left: "badinka", right: "iheartraves" };
 
     function switchBrand(brand) {
       currentBrand = brand;
@@ -109,43 +119,47 @@
       document.getElementById("csv-btn").style.display = 'none';
       document.getElementById("pdf-btn").style.display = 'inline-block';
       loadStats();
-      updateWeekLabel();
-      loadWeeklyChart();
+      updateWeekLabel("left");
+      updateWeekLabel("right");
+      loadWeeklyChart("left");
+      loadWeeklyChart("right");
     }
 
-    function updateWeekLabel() {
+    function updateWeekLabel(side) {
+      const offset = weekOffsets[side];
       const now = new Date();
-      now.setDate(now.getDate() - (now.getDay() + 6) % 7 - 7 * weekOffset);
-      const monday = new Date(now);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      const label = `${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`;
-      document.getElementById("week-label").textContent = label;
+      const start = new Date(now.setDate(now.getDate() - now.getDay() + 1 - 7 * offset));
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      document.getElementById(`week-label-${side}`).textContent =
+        `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
     }
 
-    function changeWeek(offset) {
-      weekOffset += offset;
-      updateWeekLabel();
-      loadWeeklyChart();
+    function changeWeek(side, delta) {
+      weekOffsets[side] += delta;
+      updateWeekLabel(side);
+      loadWeeklyChart(side);
     }
 
-    function loadWeeklyChart() {
+    function loadWeeklyChart(side) {
+      const brand = brandMap[side];
       const tzOffset = new Date().getTimezoneOffset();
-      fetch(`/weekly_mentions?brand=${currentBrand}&tz_offset=${tzOffset}&week_offset=${weekOffset}`)
+      const weekOffset = weekOffsets[side];
+      fetch(`/weekly_mentions?brand=${brand}&tz_offset=${tzOffset}&week_offset=${weekOffset}`)
         .then(res => res.json())
         .then(data => {
           const labels = [];
           const values = [];
           for (let i = 0; i < 7; i++) {
             const d = new Date();
-            d.setDate(d.getDate() - d.getDay() + i - 7 * weekOffset);
+            d.setDate(d.getDate() - d.getDay() + 1 + i - 7 * weekOffset);
             const key = d.toISOString().slice(0, 10);
             labels.push(d.toLocaleDateString());
             values.push(data[key] || 0);
           }
-          const ctx = document.getElementById("bar-weekly").getContext("2d");
-          if (barChart) barChart.destroy();
-          barChart = new Chart(ctx, {
+          const ctx = document.getElementById(`bar-weekly-${side}`).getContext("2d");
+          if (barCharts[side]) barCharts[side].destroy();
+          barCharts[side] = new Chart(ctx, {
             type: "bar",
             data: {
               labels: labels,
@@ -164,43 +178,6 @@
             }
           });
         });
-    }
-
-    function loadData() {
-      fetch(`/data?brand=${currentBrand}`)
-        .then(res => res.json())
-        .then(data => {
-          const tbody = document.querySelector("#data-table tbody");
-          tbody.innerHTML = "";
-          data.sort((a, b) => new Date(b.created) - new Date(a.created));
-          data.forEach(item => {
-            const sentiment = item.sentiment || "neutral";
-            const sentimentBadge = `<span class="badge ${sentiment}">${sentiment}</span>`;
-            const row = document.createElement("tr");
-            row.innerHTML = `
-              <td>${item.type}</td>
-              <td>${item.subreddit}</td>
-              <td>${item.author}</td>
-              <td><a href="${item.permalink}" target="_blank">View</a></td>
-              <td>${new Date(item.created).toLocaleString("en-GB")}</td>
-              <td>${item.body || item.title || ""}</td>
-              <td>${sentimentBadge}</td>
-              <td><button onclick="deleteEntry('${item.id}')">🗑️ Delete</button></td>
-            `;
-            tbody.appendChild(row);
-          });
-        });
-    }
-
-    function deleteEntry(id) {
-      if (!confirm("Are you sure you want to delete this entry?")) return;
-      fetch("/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id })
-      })
-      .then(res => res.json())
-      .then(() => loadData());
     }
 
     function loadStats() {
@@ -244,6 +221,41 @@
           plugins: { legend: { position: "bottom" } }
         }
       });
+    }
+
+    function loadData() {
+      fetch(`/data?brand=${currentBrand}`)
+        .then(res => res.json())
+        .then(data => {
+          const tbody = document.querySelector("#data-table tbody");
+          tbody.innerHTML = "";
+          data.sort((a, b) => new Date(b.created) - new Date(a.created));
+          data.forEach(item => {
+            const sentiment = item.sentiment || "neutral";
+            const sentimentBadge = `<span class="badge ${sentiment}">${sentiment}</span>`;
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${item.type}</td>
+              <td>${item.subreddit}</td>
+              <td>${item.author}</td>
+              <td><a href="${item.permalink}" target="_blank">View</a></td>
+              <td>${new Date(item.created).toLocaleString("en-GB")}</td>
+              <td>${item.body || item.title || ""}</td>
+              <td>${sentimentBadge}</td>
+              <td><button onclick="deleteEntry('${item.id}')">🗑️ Delete</button></td>
+            `;
+            tbody.appendChild(row);
+          });
+        });
+    }
+
+    function deleteEntry(id) {
+      if (!confirm("Are you sure you want to delete this entry?")) return;
+      fetch("/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      }).then(() => loadData());
     }
 
     function downloadPDF() {
