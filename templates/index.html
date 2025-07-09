@@ -41,6 +41,7 @@
     <button id="csv-btn" onclick="window.location.href='/download'">📥 Download CSV</button>
     <button id="pdf-btn" style="display:none;" onclick="downloadPDF()">📄 Download as PDF</button>
   </p>
+
   <div id="mentions-tab">
     <table id="data-table">
       <thead>
@@ -58,6 +59,7 @@
       <tbody></tbody>
     </table>
   </div>
+
   <div id="stats-tab">
     <h2>Head to head stats</h2>
     <div class="stats-container">
@@ -71,20 +73,20 @@
       </tr>
       <tr>
         <td>
-          <div style="margin-top:20px;">
-            <button onclick="changeWeek('left', -1)">⬅️ Previous Week</button>
+          <div style="text-align: center; margin-top: 30px;">
+            <button onclick="changeWeek(-1)">⬅️ Previous Week</button>
             <span id="week-label-left" style="margin: 0 20px; font-weight: bold;">This Week</span>
-            <button onclick="changeWeek('left', 1)">Next Week ➡️</button>
+            <button onclick="changeWeek(1)">Next Week ➡️</button>
           </div>
-          <canvas id="bar-weekly-left" style="margin-top: 20px; height: 300px;"></canvas>
+          <canvas id="bar-left" style="margin-top: 20px; height: 300px;"></canvas>
         </td>
         <td>
-          <div style="margin-top:20px;">
-            <button onclick="changeWeek('right', -1)">⬅️ Previous Week</button>
+          <div style="text-align: center; margin-top: 30px;">
+            <button onclick="changeWeek(-1)">⬅️ Previous Week</button>
             <span id="week-label-right" style="margin: 0 20px; font-weight: bold;">This Week</span>
-            <button onclick="changeWeek('right', 1)">Next Week ➡️</button>
+            <button onclick="changeWeek(1)">Next Week ➡️</button>
           </div>
-          <canvas id="bar-weekly-right" style="margin-top: 20px; height: 300px;"></canvas>
+          <canvas id="bar-right" style="margin-top: 20px; height: 300px;"></canvas>
         </td>
       </tr>
     </table>
@@ -93,9 +95,8 @@
   <script>
     let currentBrand = "badinka";
     let charts = {};
-    let weekOffsets = { left: 0, right: 0 };
     let barCharts = { left: null, right: null };
-    const brandMap = { left: "badinka", right: "iheartraves" };
+    let weekOffset = 0;
 
     function switchBrand(brand) {
       currentBrand = brand;
@@ -104,7 +105,6 @@
       document.getElementById("btn-badinka").disabled = (brand === "badinka");
       document.getElementById("btn-iheartraves").disabled = (brand === "iheartraves");
       document.getElementById("btn-stats").disabled = false;
-      document.getElementById("download-link").style.display = 'inline-block';
       document.getElementById("csv-btn").style.display = 'inline-block';
       document.getElementById("pdf-btn").style.display = 'none';
       loadData();
@@ -119,108 +119,22 @@
       document.getElementById("csv-btn").style.display = 'none';
       document.getElementById("pdf-btn").style.display = 'inline-block';
       loadStats();
-      updateWeekLabel("left");
-      updateWeekLabel("right");
-      loadWeeklyChart("left");
-      loadWeeklyChart("right");
     }
 
-    function updateWeekLabel(side) {
-      const offset = weekOffsets[side];
+    function updateWeekLabel() {
       const now = new Date();
-      const start = new Date(now.setDate(now.getDate() - now.getDay() + 1 - 7 * offset));
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
-      document.getElementById(`week-label-${side}`).textContent =
-        `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+      const monday = new Date(now.setDate(now.getDate() - now.getDay() + 1 - 7 * weekOffset));
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const label = `${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`;
+      document.getElementById("week-label-left").textContent = label;
+      document.getElementById("week-label-right").textContent = label;
     }
 
-    function changeWeek(side, delta) {
-      weekOffsets[side] += delta;
-      updateWeekLabel(side);
-      loadWeeklyChart(side);
-    }
-
-    function loadWeeklyChart(side) {
-      const brand = brandMap[side];
-      const tzOffset = new Date().getTimezoneOffset();
-      const weekOffset = weekOffsets[side];
-      fetch(`/weekly_mentions?brand=${brand}&tz_offset=${tzOffset}&week_offset=${weekOffset}`)
-        .then(res => res.json())
-        .then(data => {
-          const labels = [];
-          const values = [];
-          for (let i = 0; i < 7; i++) {
-            const d = new Date();
-            d.setDate(d.getDate() - d.getDay() + 1 + i - 7 * weekOffset);
-            const key = d.toISOString().slice(0, 10);
-            labels.push(d.toLocaleDateString());
-            values.push(data[key] || 0);
-          }
-          const ctx = document.getElementById(`bar-weekly-${side}`).getContext("2d");
-          if (barCharts[side]) barCharts[side].destroy();
-          barCharts[side] = new Chart(ctx, {
-            type: "bar",
-            data: {
-              labels: labels,
-              datasets: [{
-                label: "Mentions",
-                data: values,
-                backgroundColor: "#007bff"
-              }]
-            },
-            options: {
-              responsive: true,
-              scales: {
-                y: { beginAtZero: true, title: { display: true, text: "Mentions Count" } },
-                x: { title: { display: true, text: "Date" } }
-              }
-            }
-          });
-        });
-    }
-
-    function loadStats() {
-      fetch(`/stats?brand=badinka`).then(res => res.json()).then(data => renderStats(data, "left"));
-      fetch(`/stats?brand=iheartraves`).then(res => res.json()).then(data => renderStats(data, "right"));
-    }
-
-    function renderStats(data, side) {
-      const totalMentionsToday = data.daily.posts + data.daily.comments;
-      const totalMentionsAll = data.total.posts + data.total.comments;
-      const perceptionClass = data.score > 60 ? 'positive' : data.score >= 40 ? 'neutral' : 'negative';
-      const container = document.getElementById(`stats-${side}`);
-      container.innerHTML = `
-        <h3>${data.display_name || data.brand || 'Unknown Brand'}</h3>
-        <table>
-          <tr><th colspan="2">Today</th></tr>
-          <tr><td>Posts</td><td>${data.daily.posts}</td></tr>
-          <tr><td>Comments</td><td>${data.daily.comments}</td></tr>
-          <tr><td><strong>Total Today</strong></td><td><strong>${totalMentionsToday}</strong></td></tr>
-          <tr><th colspan="2">All Time</th></tr>
-          <tr><td>Posts</td><td>${data.total.posts}</td></tr>
-          <tr><td>Comments</td><td>${data.total.comments}</td></tr>
-          <tr><td><strong>Total</strong></td><td><strong>${totalMentionsAll}</strong></td></tr>
-          <tr><th>Brand Perception Score</th><td><span class="score-label ${perceptionClass}"><strong>${data.score}/100</strong></span></td></tr>
-        </table>
-      `;
-      const ctx = document.getElementById(`pie-${side}`).getContext("2d");
-      if (charts[side]) charts[side].destroy();
-      charts[side] = new Chart(ctx, {
-        type: "pie",
-        data: {
-          labels: ["Positive", "Neutral", "Negative"],
-          datasets: [{
-            data: [data.sentiment.positive, data.sentiment.neutral, data.sentiment.negative],
-            backgroundColor: ["limegreen", "gray", "red"]
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          plugins: { legend: { position: "bottom" } }
-        }
-      });
+    function changeWeek(offset) {
+      weekOffset += offset;
+      updateWeekLabel();
+      loadWeeklyCharts();
     }
 
     function loadData() {
@@ -232,18 +146,17 @@
           data.sort((a, b) => new Date(b.created) - new Date(a.created));
           data.forEach(item => {
             const sentiment = item.sentiment || "neutral";
-            const sentimentBadge = `<span class="badge ${sentiment}">${sentiment}</span>`;
+            const badge = `<span class="badge ${sentiment}">${sentiment}</span>`;
             const row = document.createElement("tr");
             row.innerHTML = `
               <td>${item.type}</td>
               <td>${item.subreddit}</td>
               <td>${item.author}</td>
               <td><a href="${item.permalink}" target="_blank">View</a></td>
-              <td>${new Date(item.created).toLocaleString("en-GB")}</td>
+              <td>${new Date(item.created).toLocaleString()}</td>
               <td>${item.body || item.title || ""}</td>
-              <td>${sentimentBadge}</td>
-              <td><button onclick="deleteEntry('${item.id}')">🗑️ Delete</button></td>
-            `;
+              <td>${badge}</td>
+              <td><button onclick="deleteEntry('${item.id}')">🗑️ Delete</button></td>`;
             tbody.appendChild(row);
           });
         });
@@ -258,15 +171,101 @@
       }).then(() => loadData());
     }
 
+    function loadStats() {
+      const tz = new Date().getTimezoneOffset();
+      fetch(`/stats?brand=badinka&tz_offset=${tz}`).then(res => res.json()).then(data => renderStats(data, "left"));
+      fetch(`/stats?brand=iheartraves&tz_offset=${tz}`).then(res => res.json()).then(data => renderStats(data, "right"));
+      updateWeekLabel();
+      loadWeeklyCharts();
+    }
+
+    function renderStats(data, side) {
+      const totalToday = data.daily.posts + data.daily.comments;
+      const totalAll = data.total.posts + data.total.comments;
+      const perception = data.score > 60 ? 'positive' : data.score >= 40 ? 'neutral' : 'negative';
+
+      const container = document.getElementById(`stats-${side}`);
+      container.innerHTML = `
+        <h3>${data.brand}</h3>
+        <table>
+          <tr><th colspan="2">Today</th></tr>
+          <tr><td>Posts</td><td>${data.daily.posts}</td></tr>
+          <tr><td>Comments</td><td>${data.daily.comments}</td></tr>
+          <tr><td><strong>Total Today</strong></td><td><strong>${totalToday}</strong></td></tr>
+          <tr><th colspan="2">All Time</th></tr>
+          <tr><td>Posts</td><td>${data.total.posts}</td></tr>
+          <tr><td>Comments</td><td>${data.total.comments}</td></tr>
+          <tr><td><strong>Total</strong></td><td><strong>${totalAll}</strong></td></tr>
+          <tr><th>Brand Perception Score</th><td><span class="score-label ${perception}"><strong>${data.score}/100</strong></span></td></tr>
+        </table>`;
+
+      const ctx = document.getElementById(`pie-${side}`).getContext("2d");
+      if (charts[side]) charts[side].destroy();
+      charts[side] = new Chart(ctx, {
+        type: "pie",
+        data: {
+          labels: ["Positive", "Neutral", "Negative"],
+          datasets: [{ data: [data.sentiment.positive, data.sentiment.neutral, data.sentiment.negative], backgroundColor: ["limegreen", "gray", "red"] }]
+        },
+        options: { plugins: { legend: { position: "bottom" } }, responsive: true }
+      });
+    }
+
+    function loadWeeklyCharts() {
+      const tz = new Date().getTimezoneOffset();
+      Promise.all([
+        fetch(`/weekly_mentions?brand=badinka&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json()),
+        fetch(`/weekly_mentions?brand=iheartraves&tz_offset=${tz}&week_offset=${weekOffset}`).then(res => res.json())
+      ]).then(([leftData, rightData]) => {
+        const labels = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - d.getDay() + i - 7 * weekOffset);
+          return d.toLocaleDateString();
+        });
+
+        const leftValues = labels.map(label => leftData[toISODate(label)] || 0);
+        const rightValues = labels.map(label => rightData[toISODate(label)] || 0);
+        const maxY = Math.max(...leftValues, ...rightValues) + 1;
+
+        drawBarChart("left", labels, leftValues, maxY);
+        drawBarChart("right", labels, rightValues, maxY);
+      });
+    }
+
+    function drawBarChart(side, labels, values, maxY) {
+      const ctx = document.getElementById(`bar-${side}`).getContext("2d");
+      if (barCharts[side]) barCharts[side].destroy();
+      barCharts[side] = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: "Mentions",
+            data: values,
+            backgroundColor: "#007bff"
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true, max: maxY, title: { display: true, text: "Mentions Count" } },
+            x: { title: { display: true, text: "Date" } }
+          }
+        }
+      });
+    }
+
+    function toISODate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toISOString().split("T")[0];
+    }
+
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
       html2canvas(document.querySelector("#stats-tab")).then(canvas => {
         const doc = new jsPDF();
-        const imgData = canvas.toDataURL("image/png");
-        const imgProps = doc.getImageProperties(imgData);
-        const pdfWidth = doc.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-        doc.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+        const img = canvas.toDataURL("image/png");
+        doc.addImage(img, "PNG", 0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight());
         doc.save("brand-stats.pdf");
       });
     }
