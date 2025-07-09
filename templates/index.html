@@ -69,11 +69,23 @@
         <td><canvas id="pie-left"></canvas></td>
         <td><canvas id="pie-right"></canvas></td>
       </tr>
+      <tr>
+        <td colspan="2">
+          <div style="text-align: center; margin-top: 30px;">
+            <button onclick="changeWeek(-1)">⬅️ Previous Week</button>
+            <span id="week-label" style="margin: 0 20px; font-weight: bold;">This Week</span>
+            <button onclick="changeWeek(1)">Next Week ➡️</button>
+          </div>
+          <canvas id="bar-weekly" style="margin-top: 20px; height: 300px;"></canvas>
+        </td>
+      </tr>
     </table>
   </div>
   <script>
     let currentBrand = "badinka";
     let charts = {};
+    let weekOffset = 0;
+    let barChart;
 
     function switchBrand(brand) {
       currentBrand = brand;
@@ -89,7 +101,6 @@
     }
 
     function showStats() {
-      const tzOffset = new Date().getTimezoneOffset(); // in minutes
       document.getElementById("mentions-tab").style.display = "none";
       document.getElementById("stats-tab").style.display = "block";
       document.getElementById("btn-badinka").disabled = false;
@@ -97,8 +108,62 @@
       document.getElementById("btn-stats").disabled = true;
       document.getElementById("csv-btn").style.display = 'none';
       document.getElementById("pdf-btn").style.display = 'inline-block';
-      fetch(`/stats?brand=badinka&tz_offset=${tzOffset}`).then(res => res.json()).then(data => renderStats(data, "left"));
-      fetch(`/stats?brand=iheartraves&tz_offset=${tzOffset}`).then(res => res.json()).then(data => renderStats(data, "right"));
+      loadStats();
+      updateWeekLabel();
+      loadWeeklyChart();
+    }
+
+    function updateWeekLabel() {
+      const now = new Date();
+      now.setDate(now.getDate() - (now.getDay() + 6) % 7 - 7 * weekOffset);
+      const monday = new Date(now);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const label = `${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`;
+      document.getElementById("week-label").textContent = label;
+    }
+
+    function changeWeek(offset) {
+      weekOffset += offset;
+      updateWeekLabel();
+      loadWeeklyChart();
+    }
+
+    function loadWeeklyChart() {
+      const tzOffset = new Date().getTimezoneOffset();
+      fetch(`/weekly_mentions?brand=${currentBrand}&tz_offset=${tzOffset}&week_offset=${weekOffset}`)
+        .then(res => res.json())
+        .then(data => {
+          const labels = [];
+          const values = [];
+          for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - d.getDay() + i - 7 * weekOffset);
+            const key = d.toISOString().slice(0, 10);
+            labels.push(d.toLocaleDateString());
+            values.push(data[key] || 0);
+          }
+          const ctx = document.getElementById("bar-weekly").getContext("2d");
+          if (barChart) barChart.destroy();
+          barChart = new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels: labels,
+              datasets: [{
+                label: "Mentions",
+                data: values,
+                backgroundColor: "#007bff"
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                y: { beginAtZero: true, title: { display: true, text: "Mentions Count" } },
+                x: { title: { display: true, text: "Date" } }
+              }
+            }
+          });
+        });
     }
 
     function loadData() {
@@ -117,7 +182,7 @@
               <td>${item.subreddit}</td>
               <td>${item.author}</td>
               <td><a href="${item.permalink}" target="_blank">View</a></td>
-              <td>${new Date(item.created).toLocaleString()}</td>
+              <td>${new Date(item.created).toLocaleString("en-GB")}</td>
               <td>${item.body || item.title || ""}</td>
               <td>${sentimentBadge}</td>
               <td><button onclick="deleteEntry('${item.id}')">🗑️ Delete</button></td>
@@ -133,7 +198,14 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id })
-      }).then(res => res.json()).then(() => loadData());
+      })
+      .then(res => res.json())
+      .then(() => loadData());
+    }
+
+    function loadStats() {
+      fetch(`/stats?brand=badinka`).then(res => res.json()).then(data => renderStats(data, "left"));
+      fetch(`/stats?brand=iheartraves`).then(res => res.json()).then(data => renderStats(data, "right"));
     }
 
     function renderStats(data, side) {
@@ -142,7 +214,7 @@
       const perceptionClass = data.score > 60 ? 'positive' : data.score >= 40 ? 'neutral' : 'negative';
       const container = document.getElementById(`stats-${side}`);
       container.innerHTML = `
-        <h3>${data.brand}</h3>
+        <h3>${data.display_name || data.brand || 'Unknown Brand'}</h3>
         <table>
           <tr><th colspan="2">Today</th></tr>
           <tr><td>Posts</td><td>${data.daily.posts}</td></tr>
@@ -155,7 +227,6 @@
           <tr><th>Brand Perception Score</th><td><span class="score-label ${perceptionClass}"><strong>${data.score}/100</strong></span></td></tr>
         </table>
       `;
-
       const ctx = document.getElementById(`pie-${side}`).getContext("2d");
       if (charts[side]) charts[side].destroy();
       charts[side] = new Chart(ctx, {
