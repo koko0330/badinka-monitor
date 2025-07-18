@@ -10,9 +10,9 @@ A comprehensive, production-ready Reddit brand monitoring system that tracks key
 - ✅ Much easier client onboarding for commercial use
 
 ### **Complete Data Coverage**
-- ✅ **Multiple data sources**: PRAW streaming + JSON API + RSS feeds
+- ✅ **Multiple data sources**: PRAW streaming + JSON API + RSS feeds  
 - ✅ **Better reliability**: If one source fails, others continue
-- ✅ **Historical backfill**: Can capture missed data
+- ✅ **Real-time monitoring**: Captures all new mentions from deployment forward
 - ✅ **99%+ coverage** vs ~70% with original single-stream approach
 
 ### **Production-Ready Architecture**

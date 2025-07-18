@@ -43,7 +43,7 @@ class Mention:
     score: int
     sentiment: Optional[str]
     brand: str
-    source: str  # 'praw', 'pushshift', 'rss', 'json'
+    source: str  # 'praw', 'rss', 'json'
 
 class RateLimiter:
     def __init__(self, requests_per_minute: int = 50):
