@@ -1,285 +1,430 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Reddit Brand Monitoring</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <style>
-    body { font-family: sans-serif; margin: 20px; background-color: #f9f9f9; color: #333; }
-    h1, h2, h3 { color: #222; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #fff; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background-color: #f0f0f0; }
-    button { padding: 6px 12px; font-size: 14px; cursor: pointer; border-radius: 4px; border: none; background-color: #007bff; color: white; }
-    button:disabled { background-color: #aaa; cursor: not-allowed; }
-    .badge { padding: 2px 6px; border-radius: 4px; color: white; font-size: 12px; text-transform: capitalize; }
-    .positive { background-color: limegreen; }
-    .neutral  { background-color: gray; }
-    .negative { background-color: red; }
-    #brand-buttons { margin-bottom: 20px; }
-    #brand-buttons button { margin-right: 10px; }
-    #stats-tab { display: none; }
-    .stats-container { display: flex; gap: 30px; align-items: flex-start; margin-top: 20px; }
-    .stat-block { flex: 1; background: #fff; padding: 16px; border: 1px solid #ddd; border-radius: 6px; }
-    .pdf-btn, .csv-btn { display: inline-block; margin-top: 10px; }
-    .score-label { font-weight: bold; color: white; padding: 4px 8px; border-radius: 4px; display: inline-block; }
-    .charts-table { width: 100%; table-layout: fixed; margin-top: 20px; }
-    .charts-table td { text-align: center; vertical-align: top; }
-    .charts-table canvas { width: 300px; height: 300px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Brand Monitor - Commercial Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #f8fafc; color: #334155; line-height: 1.6;
+        }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 2rem; text-align: center;
+        }
+        .header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .header p { opacity: 0.9; font-size: 1.1rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; }
+        .tab { 
+            padding: 0.75rem 1.5rem; background: white; border: none; 
+            border-radius: 8px; cursor: pointer; font-weight: 500;
+            transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .tab:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        .tab.active { background: #667eea; color: white; }
+        .stats-grid { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem; margin-bottom: 2rem;
+        }
+        .stat-card { 
+            background: white; padding: 1.5rem; border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center;
+        }
+        .stat-number { font-size: 2rem; font-weight: bold; color: #667eea; }
+        .stat-label { color: #64748b; margin-top: 0.5rem; }
+        .content-section { 
+            background: white; border-radius: 12px; padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 2rem;
+        }
+        .mentions-table { width: 100%; border-collapse: collapse; }
+        .mentions-table th, .mentions-table td { 
+            padding: 0.75rem; text-align: left; border-bottom: 1px solid #e2e8f0;
+        }
+        .mentions-table th { background: #f8fafc; font-weight: 600; }
+        .badge { 
+            padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem;
+            font-weight: 500; text-transform: capitalize;
+        }
+        .badge.positive { background: #dcfce7; color: #166534; }
+        .badge.neutral { background: #f1f5f9; color: #475569; }
+        .badge.negative { background: #fecaca; color: #991b1b; }
+        .btn { 
+            padding: 0.5rem 1rem; border: none; border-radius: 6px;
+            cursor: pointer; font-weight: 500; transition: all 0.2s;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5a67d8; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .filters { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .filter-input { 
+            padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .loading { text-align: center; padding: 2rem; color: #64748b; }
+        .charts-container { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        .chart-wrapper { text-align: center; }
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .filters { flex-direction: column; }
+            .tabs { flex-wrap: wrap; }
+        }
+    </style>
 </head>
 <body>
-  <h1>Reddit Brand Monitoring</h1>
-  <div id="brand-buttons">
-    <button id="btn-badinka" onclick="switchBrand('badinka')">My Brand</button>
-    <button id="btn-iheartraves" onclick="switchBrand('iheartraves')">My Competitor</button>
-    <button id="btn-stats" onclick="showStats()">Stats</button>
-  </div>
-  <p class="csv-btn">
-    <button id="csv-btn" onclick="window.location.href='/download'">📥 Download CSV</button>
-    <button id="pdf-btn" style="display:none;" onclick="downloadPDF()">📄 Download as PDF</button>
-  </p>
-
-  <div id="mentions-tab">
-    <table id="data-table">
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Subreddit</th>
-          <th>Author</th>
-          <th>Link</th>
-          <th>Created</th>
-          <th>Preview</th>
-          <th>Sentiment</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <div id="stats-tab">
-    <h2>Head to head stats</h2>
-    <div class="stats-container">
-      <div id="stats-left" class="stat-block"></div>
-      <div id="stats-right" class="stat-block"></div>
+    <div class="header">
+        <h1>Reddit Brand Monitor</h1>
+        <p>Real-time brand mention tracking with advanced analytics</p>
     </div>
-    <table class="charts-table">
-      <tr>
-        <td><canvas id="pie-left"></canvas></td>
-        <td><canvas id="pie-right"></canvas></td>
-      </tr>
-      <tr>
-        <td>
-          <div style="text-align: center; margin-top: 30px;">
-            <button onclick="changeWeek(-1)">⬅️ Previous Week</button>
-            <span id="week-label-left" style="margin: 0 20px; font-weight: bold;">This Week</span>
-            <button onclick="changeWeek(1)">Next Week ➡️</button>
-          </div>
-          <canvas id="bar-left" style="margin-top: 20px; height: 300px;"></canvas>
-        </td>
-        <td>
-          <div style="text-align: center; margin-top: 30px;">
-            <button onclick="changeWeek(-1)">⬅️ Previous Week</button>
-            <span id="week-label-right" style="margin: 0 20px; font-weight: bold;">This Week</span>
-            <button onclick="changeWeek(1)">Next Week ➡️</button>
-          </div>
-          <canvas id="bar-right" style="margin-top: 20px; height: 300px;"></canvas>
-        </td>
-      </tr>
-    </table>
-  </div>
 
-  <script>
-    let currentBrand = "badinka";
-    let charts = {};
-    let barCharts = { left: null, right: null };
-    let weekOffset = 0;
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('dashboard')" id="tab-dashboard">Dashboard</button>
+            <button class="tab" onclick="showTab('mentions')" id="tab-mentions">Live Mentions</button>
+            <button class="tab" onclick="showTab('analytics')" id="tab-analytics">Analytics</button>
+            <button class="tab" onclick="showTab('settings')" id="tab-settings">Settings</button>
+        </div>
 
-    function switchBrand(brand) {
-      currentBrand = brand;
-      document.getElementById("mentions-tab").style.display = "block";
-      document.getElementById("stats-tab").style.display = "none";
-      document.getElementById("btn-badinka").disabled = (brand === "badinka");
-      document.getElementById("btn-iheartraves").disabled = (brand === "iheartraves");
-      document.getElementById("btn-stats").disabled = false;
-      document.getElementById("csv-btn").style.display = 'inline-block';
-      document.getElementById("pdf-btn").style.display = 'none';
-      loadData();
-    }
+        <!-- Dashboard Tab -->
+        <div id="dashboard-tab" class="tab-content">
+            <div class="stats-grid" id="stats-container">
+                <div class="loading">Loading stats...</div>
+            </div>
+            
+            <div class="content-section">
+                <h3>Recent Activity</h3>
+                <div class="charts-container">
+                    <div class="chart-wrapper">
+                        <h4>Sentiment Distribution</h4>
+                        <canvas id="sentiment-chart" width="300" height="300"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <h4>Weekly Mentions</h4>
+                        <canvas id="weekly-chart" width="300" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    function showStats() {
-      document.getElementById("mentions-tab").style.display = "none";
-      document.getElementById("stats-tab").style.display = "block";
-      document.getElementById("btn-badinka").disabled = false;
-      document.getElementById("btn-iheartraves").disabled = false;
-      document.getElementById("btn-stats").disabled = true;
-      document.getElementById("csv-btn").style.display = 'none';
-      document.getElementById("pdf-btn").style.display = 'inline-block';
-      loadStats();
-    }
+        <!-- Mentions Tab -->
+        <div id="mentions-tab" class="tab-content" style="display: none;">
+            <div class="content-section">
+                <div class="filters">
+                    <select class="filter-input" id="brand-filter">
+                        <option value="badinka">Badinka</option>
+                        <option value="iheartraves">IHeartRaves</option>
+                    </select>
+                    <input type="text" class="filter-input" id="subreddit-filter" placeholder="Filter by subreddit">
+                    <select class="filter-input" id="sentiment-filter">
+                        <option value="">All Sentiments</option>
+                        <option value="positive">Positive</option>
+                        <option value="neutral">Neutral</option>
+                        <option value="negative">Negative</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="loadMentions()">Refresh</button>
+                    <button class="btn btn-primary" onclick="exportData()">Export CSV</button>
+                </div>
 
-    function changeWeek(offset) {
-      weekOffset += offset;
-      loadWeeklyCharts();
-    }
+                <table class="mentions-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Subreddit</th>
+                            <th>Author</th>
+                            <th>Content</th>
+                            <th>Created</th>
+                            <th>Score</th>
+                            <th>Sentiment</th>
+                            <th>Source</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mentions-tbody">
+                        <tr><td colspan="9" class="loading">Loading mentions...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-    function getMonday(offset) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const monday = new Date(today);
-      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + 7 * offset);
-      return monday;
-    }
+        <!-- Analytics Tab -->
+        <div id="analytics-tab" class="tab-content" style="display: none;">
+            <div class="content-section">
+                <h3>Trending Subreddits</h3>
+                <div id="trending-container" class="loading">Loading trending data...</div>
+            </div>
+        </div>
 
-    function updateWeekLabel(monday) {
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      const label = `${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`;
-      document.getElementById("week-label-left").textContent = label;
-      document.getElementById("week-label-right").textContent = label;
-    }
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content" style="display: none;">
+            <div class="content-section">
+                <h3>System Status</h3>
+                <div id="status-container" class="loading">Loading system status...</div>
+            </div>
+        </div>
+    </div>
 
-    function loadData() {
-      fetch(`/data?brand=${currentBrand}`)
-        .then(res => res.json())
-        .then(data => {
-          const tbody = document.querySelector("#data-table tbody");
-          tbody.innerHTML = "";
-          data.sort((a, b) => new Date(b.created) - new Date(a.created));
-          data.forEach(item => {
-            const sentiment = item.sentiment || "neutral";
-            const badge = `<span class="badge ${sentiment}">${sentiment}</span>`;
-            const row = document.createElement("tr");
-            row.innerHTML = `
-              <td>${item.type}</td>
-              <td>${item.subreddit}</td>
-              <td>${item.author}</td>
-              <td><a href="${item.permalink}" target="_blank">View</a></td>
-              <td>${new Date(item.created).toLocaleString()}</td>
-              <td>${item.body || item.title || ""}</td>
-              <td>${badge}</td>
-              <td><button onclick="deleteEntry('${item.id}')">🗑️ Delete</button></td>`;
-            tbody.appendChild(row);
-          });
-        });
-    }
+    <script>
+        let currentBrand = 'badinka';
+        let mentionsData = [];
+        let charts = {};
 
-    function deleteEntry(id) {
-      if (!confirm("Are you sure you want to delete this entry?")) return;
-      fetch("/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id })
-      }).then(() => loadData());
-    }
-
-    function loadStats() {
-      const tzOffset = new Date().getTimezoneOffset();
-      fetch(`/stats?brand=badinka&tz_offset=${tzOffset}`).then(res => res.json()).then(data => renderStats(data, "left"));
-      fetch(`/stats?brand=iheartraves&tz_offset=${tzOffset}`).then(res => res.json()).then(data => renderStats(data, "right"));
-      loadWeeklyCharts();
-    }
-
-    function renderStats(data, side) {
-      const totalToday = data.daily.posts + data.daily.comments;
-      const totalAll = data.total.posts + data.total.comments;
-      const perception = data.score > 60 ? 'positive' : data.score >= 40 ? 'neutral' : 'negative';
-
-      const container = document.getElementById(`stats-${side}`);
-      container.innerHTML = `
-        <h3>${data.brand}</h3>
-        <table>
-          <tr><th colspan="2">Today</th></tr>
-          <tr><td>Posts</td><td>${data.daily.posts}</td></tr>
-          <tr><td>Comments</td><td>${data.daily.comments}</td></tr>
-          <tr><td><strong>Total Today</strong></td><td><strong>${totalToday}</strong></td></tr>
-          <tr><th colspan="2">All Time</th></tr>
-          <tr><td>Posts</td><td>${data.total.posts}</td></tr>
-          <tr><td>Comments</td><td>${data.total.comments}</td></tr>
-          <tr><td><strong>Total</strong></td><td><strong>${totalAll}</strong></td></tr>
-          <tr><th>Brand Perception Score</th><td><span class="score-label ${perception}"><strong>${data.score}/100</strong></span></td></tr>
-        </table>`;
-
-      const ctx = document.getElementById(`pie-${side}`).getContext("2d");
-      if (charts[side]) charts[side].destroy();
-      charts[side] = new Chart(ctx, {
-        type: "pie",
-        data: {
-          labels: ["Positive", "Neutral", "Negative"],
-          datasets: [{
-            data: [data.sentiment.positive, data.sentiment.neutral, data.sentiment.negative],
-            backgroundColor: ["limegreen", "gray", "red"]
-          }]
-        },
-        options: { plugins: { legend: { position: "bottom" } }, responsive: true }
-      });
-    }
-
-    function loadWeeklyCharts() {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const monday = getMonday(weekOffset);
-      updateWeekLabel(monday);
-
-      const days = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        d.setHours(0, 0, 0, 0);
-        return d;
-      });
-
-      const labels = days.map(d => d.toLocaleDateString());
-      const keys = days.map(d => d.toLocaleDateString('en-CA'));  // en-CA = YYYY-MM-DD
-
-      Promise.all([
-        fetch(`/weekly_mentions?brand=badinka&tz=${tz}&week_offset=${weekOffset}`).then(res => res.json()),
-        fetch(`/weekly_mentions?brand=iheartraves&tz=${tz}&week_offset=${weekOffset}`).then(res => res.json())
-      ]).then(([leftData, rightData]) => {
-        const leftValues = keys.map(key => leftData[key] || 0);
-        const rightValues = keys.map(key => rightData[key] || 0);
-        const maxY = Math.max(...leftValues, ...rightValues, 1);
-        drawBarChart("left", labels, leftValues, maxY);
-        drawBarChart("right", labels, rightValues, maxY);
-      });
-    }
-
-    function drawBarChart(side, labels, values, maxY) {
-      const ctx = document.getElementById(`bar-${side}`).getContext("2d");
-      if (barCharts[side]) barCharts[side].destroy();
-      barCharts[side] = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels: labels,
-          datasets: [{
-            label: "Mentions",
-            data: values,
-            backgroundColor: "#007bff"
-          }]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            y: { beginAtZero: true, max: maxY, title: { display: true, text: "Mentions Count" } },
-            x: { title: { display: true, text: "Date" } }
-          }
+        // Tab management
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            
+            document.getElementById(tabName + '-tab').style.display = 'block';
+            document.getElementById('tab-' + tabName).classList.add('active');
+            
+            if (tabName === 'dashboard') loadDashboard();
+            else if (tabName === 'mentions') loadMentions();
+            else if (tabName === 'analytics') loadAnalytics();
+            else if (tabName === 'settings') loadSystemStatus();
         }
-      });
-    }
 
-    function downloadPDF() {
-      const { jsPDF } = window.jspdf;
-      html2canvas(document.querySelector("#stats-tab")).then(canvas => {
-        const doc = new jsPDF();
-        const img = canvas.toDataURL("image/png");
-        doc.addImage(img, "PNG", 0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight());
-        doc.save("brand-stats.pdf");
-      });
-    }
+        // Load dashboard data
+        async function loadDashboard() {
+            try {
+                const [statsRes, weeklyRes] = await Promise.all([
+                    fetch(`/stats?brand=${currentBrand}`),
+                    fetch(`/weekly_mentions?brand=${currentBrand}`)
+                ]);
+                
+                const stats = await statsRes.json();
+                const weekly = await weeklyRes.json();
+                
+                renderStats(stats);
+                renderCharts(stats, weekly);
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
 
-    switchBrand(currentBrand);
-    setInterval(loadData, 30000);
-  </script>
+        function renderStats(stats) {
+            const container = document.getElementById('stats-container');
+            container.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${stats.daily.posts + stats.daily.comments}</div>
+                    <div class="stat-label">Today's Mentions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.total.posts + stats.total.comments}</div>
+                    <div class="stat-label">Total Mentions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.score}/100</div>
+                    <div class="stat-label">Sentiment Score</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${Object.keys(stats.sources || {}).length}</div>
+                    <div class="stat-label">Data Sources</div>
+                </div>
+            `;
+        }
+
+        function renderCharts(stats, weekly) {
+            // Sentiment pie chart
+            const sentimentCtx = document.getElementById('sentiment-chart').getContext('2d');
+            if (charts.sentiment) charts.sentiment.destroy();
+            
+            charts.sentiment = new Chart(sentimentCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Positive', 'Neutral', 'Negative'],
+                    datasets: [{
+                        data: [stats.sentiment.positive, stats.sentiment.neutral, stats.sentiment.negative],
+                        backgroundColor: ['#22c55e', '#64748b', '#ef4444']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // Weekly line chart
+            const weeklyCtx = document.getElementById('weekly-chart').getContext('2d');
+            if (charts.weekly) charts.weekly.destroy();
+            
+            const dates = Object.keys(weekly).sort();
+            const counts = dates.map(date => weekly[date].total || 0);
+            
+            charts.weekly = new Chart(weeklyCtx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Mentions',
+                        data: counts,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        fill: true
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // Load mentions
+        async function loadMentions() {
+            const brand = document.getElementById('brand-filter').value;
+            const subreddit = document.getElementById('subreddit-filter').value;
+            const sentiment = document.getElementById('sentiment-filter').value;
+            
+            let url = `/data?brand=${brand}&per_page=50`;
+            if (subreddit) url += `&subreddit=${subreddit}`;
+            if (sentiment) url += `&sentiment=${sentiment}`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                mentionsData = data.results || [];
+                renderMentions(mentionsData);
+            } catch (error) {
+                console.error('Error loading mentions:', error);
+            }
+        }
+
+        function renderMentions(mentions) {
+            const tbody = document.getElementById('mentions-tbody');
+            if (mentions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="loading">No mentions found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = mentions.map(mention => `
+                <tr>
+                    <td>${mention.type}</td>
+                    <td>r/${mention.subreddit}</td>
+                    <td>u/${mention.author}</td>
+                    <td>
+                        <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            ${mention.title || mention.body || ''}
+                        </div>
+                        <a href="${mention.permalink}" target="_blank" style="font-size: 0.8rem; color: #667eea;">View →</a>
+                    </td>
+                    <td>${new Date(mention.created).toLocaleDateString()}</td>
+                    <td>${mention.score}</td>
+                    <td><span class="badge ${mention.sentiment || 'neutral'}">${mention.sentiment || 'neutral'}</span></td>
+                    <td>${mention.source}</td>
+                    <td>
+                        <button class="btn btn-danger" onclick="deleteMention('${mention.id}')" style="font-size: 0.8rem;">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Load analytics
+        async function loadAnalytics() {
+            try {
+                const response = await fetch(`/trending_subreddits?brand=${currentBrand}`);
+                const trending = await response.json();
+                
+                const container = document.getElementById('trending-container');
+                container.innerHTML = `
+                    <table class="mentions-table">
+                        <thead>
+                            <tr>
+                                <th>Subreddit</th>
+                                <th>Mentions</th>
+                                <th>Avg Score</th>
+                                <th>Positive %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${trending.map(item => `
+                                <tr>
+                                    <td>r/${item.subreddit}</td>
+                                    <td>${item.mention_count}</td>
+                                    <td>${item.avg_score.toFixed(1)}</td>
+                                    <td>${(item.sentiment_ratio * 100).toFixed(1)}%</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+            }
+        }
+
+        // Load system status
+        async function loadSystemStatus() {
+            try {
+                const response = await fetch('/system_status');
+                const status = await response.json();
+                
+                const container = document.getElementById('status-container');
+                container.innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number">${status.total_mentions}</div>
+                            <div class="stat-label">Total Mentions</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${status.total_brands}</div>
+                            <div class="stat-label">Brands Tracked</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${status.total_subreddits}</div>
+                            <div class="stat-label">Subreddits</div>
+                        </div>
+                    </div>
+                    
+                    <h4>Data Sources</h4>
+                    <table class="mentions-table">
+                        <thead>
+                            <tr><th>Source</th><th>Total Mentions</th><th>Last Update</th></tr>
+                        </thead>
+                        <tbody>
+                            ${status.sources.map(source => `
+                                <tr>
+                                    <td>${source.source}</td>
+                                    <td>${source.count}</td>
+                                    <td>${source.last_update ? new Date(source.last_update).toLocaleString() : 'N/A'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Error loading system status:', error);
+            }
+        }
+
+        // Utility functions
+        async function deleteMention(id) {
+            if (!confirm('Are you sure you want to delete this mention?')) return;
+            
+            try {
+                await fetch('/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                loadMentions();
+            } catch (error) {
+                console.error('Error deleting mention:', error);
+            }
+        }
+
+        function exportData() {
+            const brand = document.getElementById('brand-filter').value;
+            window.open(`/export?brand=${brand}&format=csv`, '_blank');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboard();
+            setInterval(loadDashboard, 30000); // Refresh every 30 seconds
+        });
+    </script>
 </body>
 </html>
