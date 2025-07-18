@@ -1,4 +1,11 @@
-Flask
-pandas
-psycopg2-binary
-pytz
+flask==2.3.3
+psycopg2-binary==2.9.7
+praw==7.7.1
+aiohttp==3.8.6
+aioredis==2.0.1
+feedparser==6.0.10
+beautifulsoup4==4.12.2
+markdown==3.5.1
+requests==2.31.0
+python-dotenv==1.0.0
+gunicorn==21.2.0
